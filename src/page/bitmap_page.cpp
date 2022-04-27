@@ -36,7 +36,7 @@ bool BitmapPage<PageSize>::DeAllocatePage(uint32_t page_offset) {
 
 template <size_t PageSize>
 bool BitmapPage<PageSize>::IsPageFree(uint32_t page_offset) const {
-  if (bytes[page_offset]) return true;
+  if (!(bytes[page_offset / 8] & (0x80 >> (page_offset % 8)))) return true;
   return false;
 }
 
