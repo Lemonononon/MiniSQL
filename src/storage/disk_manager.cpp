@@ -45,13 +45,14 @@ page_id_t DiskManager::AllocatePage() {
 //  ASSERT(false, "Not implemented yet.");
 //  return INVALID_PAGE_ID;
 
-  page_id_t pageId = 1;
-
-  //allocate and deallocate都需要修改meta_data
-  //ReadPage(META_PAGE_ID,meta_data_);
-  //别忘了修改meta_data_
-  WritePage(META_PAGE_ID, meta_data_);
-  return pageId;
+//  page_id_t pageId = 1;
+//
+//  //allocate and deallocate都需要修改meta_data
+//  //ReadPage(META_PAGE_ID,meta_data_);
+//  //别忘了修改meta_data_
+//  WritePage(META_PAGE_ID, meta_data_);
+//  return pageId;
+  return 0;
 }
 
 void DiskManager::DeAllocatePage(page_id_t logical_page_id) {
@@ -60,17 +61,18 @@ void DiskManager::DeAllocatePage(page_id_t logical_page_id) {
 }
 
 bool DiskManager::IsPageFree(page_id_t logical_page_id) {
-  page_id_t physical_page_id = MapPageId(logical_page_id);
-  if ( meta_data_[physical_page_id/8] & (0x80>>(physical_page_id%8)) )  return false;
+//  page_id_t physical_page_id = MapPageId(logical_page_id);
+//  if ( meta_data_[physical_page_id/8] & (0x80>>(physical_page_id%8)) )  return false;
   return true;
 }
 
 page_id_t DiskManager::MapPageId(page_id_t logical_page_id) {
   //logical_page_id = physical_page_id - 1 - number_of_bitmap
-
-  page_id_t physical_page_id = logical_page_id + 1 ;
-
-  return physical_page_id;
+//
+//  page_id_t physical_page_id = logical_page_id + 1 + ;
+//
+//  return physical_page_id;
+  return 0;
 }
 
 int DiskManager::GetFileSize(const std::string &file_name) {
