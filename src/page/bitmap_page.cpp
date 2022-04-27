@@ -1,12 +1,15 @@
 #include "page/bitmap_page.h"
+//#include <iostream>
 
 template <size_t PageSize>
 bool BitmapPage<PageSize>::AllocatePage(uint32_t &page_offset) {
-  // 在这里allocate还是说只修改bitmap？
-  //
+  // 根据.h中的注释，bitmap的语义是isUsed，即1表示已用，0表示为空
+  // 这里只修改bitmap
   if (page_allocated_ < MAX_CHARS * 8) {
     page_allocated_++;
     page_offset = next_free_page_;
+    // 将添加的那一位置1
+    bytes[page_offset / 8] = bytes[page_offset / 8] | (0x80 >> (page_offset % 8));
     uint32_t index = 0;
     // find next free page
     // 获取这里需要从0开始查询？因为可能会有前面的page被释放掉了
@@ -15,6 +18,7 @@ bool BitmapPage<PageSize>::AllocatePage(uint32_t &page_offset) {
       index++;
     }
     next_free_page_ = index;
+//    std::cout << next_free_page_ << std::endl;
     // 如果index达到了MAX_CHARS，并且在下次分配之前没有释放，那么下次分配就没有空闲page，allocate失败
     return true;
   }
@@ -27,7 +31,8 @@ bool BitmapPage<PageSize>::DeAllocatePage(uint32_t page_offset) {
     if (page_allocated_ == MAX_CHARS * 8) {
       next_free_page_ = page_offset;
     }
-    bytes[page_offset / 8] = bytes[page_offset / 8] | (0x80 >> (page_offset % 8));
+    // 将删掉的那一位置0
+    bytes[page_offset / 8] = bytes[page_offset / 8] & (~(0x80 >> (page_offset % 8)));
     page_allocated_--;
     return true;
   }
