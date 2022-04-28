@@ -44,35 +44,47 @@ void DiskManager::WritePage(page_id_t logical_page_id, const char *page_data) {
 page_id_t DiskManager::AllocatePage() {
 //  ASSERT(false, "Not implemented yet.");
 //  return INVALID_PAGE_ID;
+ //allocate and deallocate都需要修改meta_data
+  DiskFileMetaPage *meta_page = reinterpret_cast<DiskFileMetaPage *>(meta_data_);
+  page_id_t pageId;
 
-//  page_id_t pageId = 1;
-//
-//  //allocate and deallocate都需要修改meta_data
-//  //ReadPage(META_PAGE_ID,meta_data_);
-//  //别忘了修改meta_data_
-//  WritePage(META_PAGE_ID, meta_data_);
-//  return pageId;
-  return 0;
+  //寻找第一个没有满额的extent
+  uint32_t extent_id = 0;
+  size_t max_size_of_bitmap = BitmapPage<PAGE_SIZE>::GetMaxSupportedSize();
+  while( true ){
+    if (meta_page->extent_used_page_[extent_id] < max_size_of_bitmap ) break;
+    extent_id++;
+  };
+  //pageId = 已满的extent个数*bitmap size + 现在的extent已经占用的page+1
+  pageId = extent_id*max_size_of_bitmap + meta_page->extent_used_page_[extent_id]+1;
+  //修改meta_data
+  if (extent_id >=meta_page->num_extents_) meta_page->num_extents_+=1;//开辟一个新的extent
+  meta_page->num_allocated_pages_++;
+  WritePage(META_PAGE_ID, meta_data_);
+  return pageId;
+  //TODO：暂时未考虑溢出问题
 }
 
 void DiskManager::DeAllocatePage(page_id_t logical_page_id) {
 //  ASSERT(false, "Not implemented yet.");
+  DiskFileMetaPage *meta_page = reinterpret_cast<DiskFileMetaPage *>(meta_data_);
 
 }
 
 bool DiskManager::IsPageFree(page_id_t logical_page_id) {
 //  page_id_t physical_page_id = MapPageId(logical_page_id);
 //  if ( meta_data_[physical_page_id/8] & (0x80>>(physical_page_id%8)) )  return false;
-  return true;
+//  if (logical_page_id < 0)
+  DiskFileMetaPage *meta_page = reinterpret_cast<DiskFileMetaPage *>(meta_data_);
+  return !(meta_page->GetAllocatedPages() >= uint32_t(logical_page_id )+1);
 }
 
 page_id_t DiskManager::MapPageId(page_id_t logical_page_id) {
+  DiskFileMetaPage *meta_page = reinterpret_cast<DiskFileMetaPage *>(meta_data_);
   //logical_page_id = physical_page_id - 1 - number_of_bitmap
-//
-//  page_id_t physical_page_id = logical_page_id + 1 + ;
-//
-//  return physical_page_id;
-  return 0;
+  page_id_t physical_page_id = logical_page_id + 1 + meta_page->GetExtentNums();
+
+  return physical_page_id;
 }
 
 int DiskManager::GetFileSize(const std::string &file_name) {
