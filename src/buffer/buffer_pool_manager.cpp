@@ -24,7 +24,12 @@ Page *BufferPoolManager::FetchPage(page_id_t page_id) {
   // 1.1    If P exists, pin it and return it immediately.
   // 1.2    If P does not exist, find a replacement page (R) from either the free list or the replacer.
   //        Note that pages are always found from the free list first.
+  //        先从free_list_里找buffer pool还有没有空位，有的话直接从磁盘拉进空位，
+  //        没有的话去看看replacer里有没有东西，有的话把那里对应的页清一个，buffer pool就又有空位力，用此空位
   // 2.     If R is dirty, write it back to the disk.
+  //        其他类可以调用并修改buffer pool中的page，所以会产生缓存中和disk中不一致的情况，也就是dirty，我们需要将dirty的数据写回disk
+  //        实际上其他类应该保证修改数据后即调用FlushPage将脏数据存进disk，但在并发的情况下，这个操作可能随时会被打断，如果FetchPage时不把dirty数据写回disk，可能发生这样的情况：
+  //        其他类修改完page，刚把它移进free_list_或lru replacer，此时FetchPage把这个Page直接拿来用了，那么这个修改过的脏数据就丢失了
   // 3.     Delete R from the page table and insert P.
   // 4.     Update P's metadata, read in the page content from disk, and then return a pointer to P.
   return nullptr;

@@ -46,11 +46,11 @@ private:
 
 private:
   size_t pool_size_;                                        // number of pages in buffer pool
-  Page *pages_;                                             // array of pages
+  Page *pages_;                                             // array of pages, all empty at beginning.
   DiskManager *disk_manager_;                               // pointer to the disk manager.
-  std::unordered_map<page_id_t, frame_id_t> page_table_;    // to keep track of pages
+  std::unordered_map<page_id_t, frame_id_t> page_table_;    // to keep track of pages, page_id_t is the type of logical page id, frame_id_t is the type of page index in Page *pages_
   Replacer *replacer_;                                      // to find an unpinned page for replacement
-  std::list<frame_id_t> free_list_;                         // to find a free page for replacement
+  std::list<frame_id_t> free_list_;                         // to find a free page for replacement, init with all frame_id (totally the whole pool size)
   recursive_mutex latch_;                                   // to protect shared data structure
 };
 
