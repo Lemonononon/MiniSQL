@@ -66,8 +66,8 @@ page_id_t DiskManager::AllocatePage() {
 }
 
 void DiskManager::DeAllocatePage(page_id_t logical_page_id) {
-//  ASSERT(false, "Not implemented yet.");
-  DiskFileMetaPage *meta_page = reinterpret_cast<DiskFileMetaPage *>(meta_data_);
+  ASSERT(false, "Not implemented yet.");
+//  DiskFileMetaPage *meta_page = reinterpret_cast<DiskFileMetaPage *>(meta_data_);
 
 }
 
