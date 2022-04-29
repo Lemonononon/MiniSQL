@@ -3,7 +3,7 @@
 #include "page/bitmap_page.h"
 
 BufferPoolManager::BufferPoolManager(size_t pool_size, DiskManager *disk_manager)
-        : pool_size_(pool_size), disk_manager_(disk_manager) {
+    : pool_size_(pool_size), disk_manager_(disk_manager) {
   pages_ = new Page[pool_size_];
   replacer_ = new LRUReplacer(pool_size_);
   for (size_t i = 0; i < pool_size_; i++) {
@@ -12,7 +12,7 @@ BufferPoolManager::BufferPoolManager(size_t pool_size, DiskManager *disk_manager
 }
 
 BufferPoolManager::~BufferPoolManager() {
-  for (auto page: page_table_) {
+  for (auto page : page_table_) {
     FlushPage(page.first);
   }
   delete[] pages_;
@@ -27,37 +27,42 @@ Page *BufferPoolManager::FetchPage(page_id_t page_id) {
   //        先从free_list_里找buffer pool还有没有空位，有的话直接从磁盘拉进空位，
   //        没有的话去看看replacer里有没有东西，有的话把那里对应的页清一个，buffer pool就又有空位力，用此空位
   // 2.     If R is dirty, write it back to the disk.
-  //        其他类可以调用并修改buffer pool中的page，所以会产生缓存中和disk中不一致的情况，也就是dirty，我们需要将dirty的数据写回disk
+  //        其他类可以调用并修改buffer
+  //        pool中的page，所以会产生缓存中和disk中不一致的情况，也就是dirty，我们需要将dirty的数据写回disk
   //        实际上其他类应该保证修改数据后即调用FlushPage将脏数据存进disk，但在并发的情况下，这个操作可能随时会被打断，如果FetchPage时不把dirty数据写回disk，可能发生这样的情况：
-  //        其他类修改完page，刚把它移进free_list_或lru replacer，此时FetchPage把这个Page直接拿来用了，那么这个修改过的脏数据就丢失了
+  //        其他类修改完page，刚把它移进free_list_或lru
+  //        replacer，此时FetchPage把这个Page直接拿来用了，那么这个修改过的脏数据就丢失了
   // 3.     Delete R from the page table and insert P.
   // 4.     Update P's metadata, read in the page content from disk, and then return a pointer to P.
   if (page_table_.find(page_id) != page_table_.end()) {
     replacer_->Pin(page_table_[page_id]);
     return pages_ + page_table_[page_id];
-  }
-  else {
+  } else {
     frame_id_t free_page_index;
     if (free_list_.size() > 0) {
       // 简单起见，直接从末尾拿一个吧
       free_page_index = free_list_.back();
       free_list_.pop_back();
-    }
-    else if (replacer_->Size() > 0) {
+    } else if (replacer_->Size() > 0) {
       frame_id_t *free_frame_receiver = nullptr;
       replacer_->Victim(free_frame_receiver);
       free_page_index = *free_frame_receiver;
-    }
-    else {
+    } else {
       return nullptr;
     }
-    // TODO: 1.dirty的判定，什么时候dirty? 2. 既然有dirty，那么这个page在buffer中的写又在哪里实现？
+    // TODO: 1.dirty的判定，什么时候dirty? => 暂定：在page里新开一个setDirty的接口，当调用者调用buffer_pool获取page并开始写入时，设置它为dirty
+    //       2.既然有dirty，那么这个page在buffer中的写又在哪里实现? =>
+    //       返回的是Page*，而Page类中GetData可以获取data的指针，从指针修改写入即可
     if (pages_[free_page_index].is_dirty_) {
       disk_manager_->WritePage(pages_[free_page_index].page_id_, pages_[free_page_index].data_);
     }
-    // TODO: 更新page_table_
+    // 更新page_table_，更新pages_中的那一页page
     page_table_.erase(pages_[free_page_index].page_id_);
-    // pages_[free_page_index] = pages_[free_page_index];
+    // Page对象里设置了不允许复制，也即重载了运算符=
+    //    pages_[free_page_index] = Page();
+    pages_[free_page_index].ResetMemory();
+    pages_[free_page_index].is_dirty_ = false;
+    pages_[free_page_index].page_id_ = page_id;
     page_table_[page_id] = free_page_index;
     disk_manager_->ReadPage(page_id, pages_[free_page_index].data_);
     return pages_ + free_page_index;
@@ -82,26 +87,18 @@ bool BufferPoolManager::DeletePage(page_id_t page_id) {
   return false;
 }
 
-bool BufferPoolManager::UnpinPage(page_id_t page_id, bool is_dirty) {
-  return false;
-}
+bool BufferPoolManager::UnpinPage(page_id_t page_id, bool is_dirty) { return false; }
 
-bool BufferPoolManager::FlushPage(page_id_t page_id) {
-  return false;
-}
+bool BufferPoolManager::FlushPage(page_id_t page_id) { return false; }
 
 page_id_t BufferPoolManager::AllocatePage() {
   int next_page_id = disk_manager_->AllocatePage();
   return next_page_id;
 }
 
-void BufferPoolManager::DeallocatePage(page_id_t page_id) {
-  disk_manager_->DeAllocatePage(page_id);
-}
+void BufferPoolManager::DeallocatePage(page_id_t page_id) { disk_manager_->DeAllocatePage(page_id); }
 
-bool BufferPoolManager::IsPageFree(page_id_t page_id) {
-  return disk_manager_->IsPageFree(page_id);
-}
+bool BufferPoolManager::IsPageFree(page_id_t page_id) { return disk_manager_->IsPageFree(page_id); }
 
 // Only used for debug
 bool BufferPoolManager::CheckAllUnpinned() {
