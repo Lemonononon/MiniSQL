@@ -18,7 +18,7 @@ bool BitmapPage<PageSize>::AllocatePage(uint32_t &page_offset) {
       index++;
     }
     next_free_page_ = index;
-//    std::cout << next_free_page_ << std::endl;
+    //    std::cout << next_free_page_ << std::endl;
     // 如果index达到了MAX_CHARS，并且在下次分配之前没有释放，那么下次分配就没有空闲page，allocate失败
     return true;
   }
