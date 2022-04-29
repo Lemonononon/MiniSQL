@@ -50,7 +50,7 @@ Page *BufferPoolManager::FetchPage(page_id_t page_id) {
     } else {
       return nullptr;
     }
-    // TODO: 1.dirty的判定，什么时候dirty? => 暂定：在page里新开一个setDirty的接口，当调用者调用buffer_pool获取page并开始写入时，设置它为dirty
+    // TODO: 1.dirty的判定，什么时候dirty? => 在UnpinPage时，由调用者传入是否dirty，因为可能有多个调用者，所以应该用一个或关系
     //       2.既然有dirty，那么这个page在buffer中的写又在哪里实现? =>
     //       返回的是Page*，而Page类中GetData可以获取data的指针，从指针修改写入即可
     if (pages_[free_page_index].is_dirty_) {
@@ -65,6 +65,8 @@ Page *BufferPoolManager::FetchPage(page_id_t page_id) {
     pages_[free_page_index].page_id_ = page_id;
     page_table_[page_id] = free_page_index;
     disk_manager_->ReadPage(page_id, pages_[free_page_index].data_);
+    replacer_->Pin(free_page_index);
+    pages_[free_page_index].pin_count_++;
     return pages_ + free_page_index;
   }
 }
@@ -75,7 +77,33 @@ Page *BufferPoolManager::NewPage(page_id_t &page_id) {
   // 2.   Pick a victim page P from either the free list or the replacer. Always pick from the free list first.
   // 3.   Update P's metadata, zero out memory and add P to the page table.
   // 4.   Set the page ID output parameter. Return a pointer to P.
-  return nullptr;
+  frame_id_t free_page_index;
+  if (free_list_.size() > 0) {
+    free_page_index = free_list_.back();
+    free_list_.pop_back();
+  } else if (replacer_->Size() > 0) {
+    frame_id_t *free_frame_receiver = nullptr;
+    replacer_->Victim(free_frame_receiver);
+    free_page_index = *free_frame_receiver;
+  } else {
+    return nullptr;
+  }
+  if (pages_[free_page_index].is_dirty_) {
+    disk_manager_->WritePage(pages_[free_page_index].page_id_, pages_[free_page_index].data_);
+  }
+  // 更新page_table_，更新pages_中的那一页page
+  page_table_.erase(pages_[free_page_index].page_id_);
+  // 从disk中分配一个新的page_id，传进引用
+  page_id = AllocatePage();
+  // Page对象里设置了不允许复制，也即重载了运算符=
+  //    pages_[free_page_index] = Page();
+  pages_[free_page_index].ResetMemory();
+  pages_[free_page_index].is_dirty_ = false;
+  pages_[free_page_index].page_id_ = page_id;
+  page_table_[page_id] = free_page_index;
+  replacer_->Pin(free_page_index);
+  pages_[free_page_index].pin_count_++;
+  return pages_ + free_page_index;
 }
 
 bool BufferPoolManager::DeletePage(page_id_t page_id) {
@@ -84,6 +112,7 @@ bool BufferPoolManager::DeletePage(page_id_t page_id) {
   // 1.   If P does not exist, return true.
   // 2.   If P exists, but has a non-zero pin-count, return false. Someone is using the page.
   // 3.   Otherwise, P can be deleted. Remove P from the page table, reset its metadata and return it to the free list.
+
   return false;
 }
 
