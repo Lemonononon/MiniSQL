@@ -32,7 +32,36 @@ Page *BufferPoolManager::FetchPage(page_id_t page_id) {
   //        其他类修改完page，刚把它移进free_list_或lru replacer，此时FetchPage把这个Page直接拿来用了，那么这个修改过的脏数据就丢失了
   // 3.     Delete R from the page table and insert P.
   // 4.     Update P's metadata, read in the page content from disk, and then return a pointer to P.
-  return nullptr;
+  if (page_table_.find(page_id) != page_table_.end()) {
+    replacer_->Pin(page_table_[page_id]);
+    return pages_ + page_table_[page_id];
+  }
+  else {
+    frame_id_t free_page_index;
+    if (free_list_.size() > 0) {
+      // 简单起见，直接从末尾拿一个吧
+      free_page_index = free_list_.back();
+      free_list_.pop_back();
+    }
+    else if (replacer_->Size() > 0) {
+      frame_id_t *free_frame_receiver = nullptr;
+      replacer_->Victim(free_frame_receiver);
+      free_page_index = *free_frame_receiver;
+    }
+    else {
+      return nullptr;
+    }
+    // TODO: 1.dirty的判定，什么时候dirty? 2. 既然有dirty，那么这个page在buffer中的写又在哪里实现？
+    if (pages_[free_page_index].is_dirty_) {
+      disk_manager_->WritePage(pages_[free_page_index].page_id_, pages_[free_page_index].data_);
+    }
+    // TODO: 更新page_table_
+    page_table_.erase(pages_[free_page_index].page_id_);
+    // pages_[free_page_index] = pages_[free_page_index];
+    page_table_[page_id] = free_page_index;
+    disk_manager_->ReadPage(page_id, pages_[free_page_index].data_);
+    return pages_ + free_page_index;
+  }
 }
 
 Page *BufferPoolManager::NewPage(page_id_t &page_id) {
