@@ -127,10 +127,10 @@ bool BufferPoolManager::DeletePage(page_id_t page_id) {
 }
 
 bool BufferPoolManager::UnpinPage(page_id_t page_id, bool is_dirty) {
+  if (page_table_.find(page_id) == page_table_.end()) return false;
   pages_[page_table_[page_id]].pin_count_--;
   pages_[page_table_[page_id]].is_dirty_ = pages_[page_table_[page_id]].is_dirty_ || is_dirty;
   replacer_->Unpin(page_table_[page_id]);
-  // TODO: 暂时没看出来这个返回值有什么用
   return true;
 }
 
