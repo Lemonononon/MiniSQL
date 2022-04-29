@@ -112,13 +112,33 @@ bool BufferPoolManager::DeletePage(page_id_t page_id) {
   // 1.   If P does not exist, return true.
   // 2.   If P exists, but has a non-zero pin-count, return false. Someone is using the page.
   // 3.   Otherwise, P can be deleted. Remove P from the page table, reset its metadata and return it to the free list.
-
-  return false;
+  if (page_table_.find(page_id) == page_table_.end()) {
+    return true;
+  } else if (pages_[page_table_[page_id]].pin_count_ > 0) {
+    return false;
+  } else {
+    DeallocatePage(page_id);
+    pages_[page_table_[page_id]].ResetMemory();
+    pages_[page_table_[page_id]].is_dirty_ = false;
+    free_list_.emplace_back(page_table_[page_id]);
+    page_table_.erase(page_id);
+    return true;
+  }
 }
 
-bool BufferPoolManager::UnpinPage(page_id_t page_id, bool is_dirty) { return false; }
+bool BufferPoolManager::UnpinPage(page_id_t page_id, bool is_dirty) {
+  pages_[page_table_[page_id]].pin_count_--;
+  pages_[page_table_[page_id]].is_dirty_ = pages_[page_table_[page_id]].is_dirty_ || is_dirty;
+  replacer_->Unpin(page_table_[page_id]);
+  // TODO: 暂时没看出来这个返回值有什么用
+  return true;
+}
 
-bool BufferPoolManager::FlushPage(page_id_t page_id) { return false; }
+bool BufferPoolManager::FlushPage(page_id_t page_id) {
+  if (page_table_.find(page_id) == page_table_.end()) return false;
+  disk_manager_->WritePage(page_id, pages_[page_table_[page_id]].data_);
+  return true;
+}
 
 page_id_t BufferPoolManager::AllocatePage() {
   int next_page_id = disk_manager_->AllocatePage();
