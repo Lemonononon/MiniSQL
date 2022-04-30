@@ -29,6 +29,10 @@ public:
    * @return whether a page in the extent is free
    */
   bool IsPageFree(uint32_t page_offset) const;
+  /**
+   * @return next_free_page_
+   */
+  uint32_t GetNextFreePage();
 
 private:
   /**

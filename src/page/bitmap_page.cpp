@@ -48,6 +48,10 @@ template <size_t PageSize>
 bool BitmapPage<PageSize>::IsPageFreeLow(uint32_t byte_index, uint8_t bit_index) const {
   return (bytes[byte_index] & (0x80 >> bit_index)) ? false : true;
 }
+template <size_t PageSize>
+uint32_t BitmapPage<PageSize>::GetNextFreePage(){
+    return next_free_page_;
+};
 
 template class BitmapPage<64>;
 

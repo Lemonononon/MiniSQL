@@ -1,5 +1,5 @@
-#include <stdexcept>
 #include <sys/stat.h>
+#include <stdexcept>
 
 #include "glog/logging.h"
 #include "page/bitmap_page.h"
@@ -42,49 +42,81 @@ void DiskManager::WritePage(page_id_t logical_page_id, const char *page_data) {
 }
 
 page_id_t DiskManager::AllocatePage() {
-//  ASSERT(false, "Not implemented yet.");
-//  return INVALID_PAGE_ID;
- //allocate and deallocate都需要修改meta_data
+  //  ASSERT(false, "Not implemented yet.");
+  //  return INVALID_PAGE_ID;
+  // allocate and deallocate都需要修改meta_data
   DiskFileMetaPage *meta_page = reinterpret_cast<DiskFileMetaPage *>(meta_data_);
   page_id_t pageId;
 
-  //寻找第一个没有满额的extent
+  // 寻找第一个没有满额的extent
   uint32_t extent_id = 0;
   size_t max_size_of_bitmap = BitmapPage<PAGE_SIZE>::GetMaxSupportedSize();
-  while( true ){
-    if (meta_page->extent_used_page_[extent_id] < max_size_of_bitmap ) break;
+  while (meta_page->extent_used_page_[extent_id] == max_size_of_bitmap) {
     extent_id++;
   };
-  //pageId = 已满的extent个数*bitmap size + 现在的extent已经占用的page+1
-  pageId = extent_id*max_size_of_bitmap + meta_page->extent_used_page_[extent_id]+1;
-  //修改meta_data
-  if (extent_id >=meta_page->num_extents_) meta_page->num_extents_+=1;//开辟一个新的extent
+  // 读取对应extent的bitmap_page，寻找第一个free的page
+  char bitmap[PAGE_SIZE];
+  size_t pages_per_extent = 1 + max_size_of_bitmap;
+  page_id_t bitmap_physical_id = extent_id * pages_per_extent + 1;
+  ReadPhysicalPage(bitmap_physical_id, bitmap);
+
+  BitmapPage<PAGE_SIZE> *bitmap_page = reinterpret_cast<BitmapPage<PAGE_SIZE> *>(bitmap);
+  uint32_t next_free_page = bitmap_page->GetNextFreePage();
+  bitmap_page->AllocatePage(next_free_page);
+
+  pageId = extent_id * max_size_of_bitmap + next_free_page;
+  // 修改meta_data
+  if (extent_id >= meta_page->num_extents_) meta_page->num_extents_ += 1;  // 开辟一个新的extent
+  meta_page->extent_used_page_[extent_id]++;
   meta_page->num_allocated_pages_++;
   WritePage(META_PAGE_ID, meta_data_);
   return pageId;
-  //TODO：暂时未考虑溢出问题
+  // TODO:暂时未考虑溢出问题
 }
 
 void DiskManager::DeAllocatePage(page_id_t logical_page_id) {
-  ASSERT(false, "Not implemented yet.");
-//  DiskFileMetaPage *meta_page = reinterpret_cast<DiskFileMetaPage *>(meta_data_);
+  //  ASSERT(false, "Not implemented yet.");
+  DiskFileMetaPage *meta_page = reinterpret_cast<DiskFileMetaPage *>(meta_data_);
 
+  char bitmap[PAGE_SIZE];
+  size_t pages_per_bitmap = BitmapPage<PAGE_SIZE>::GetMaxSupportedSize();
+  size_t pages_per_extent = 1 + pages_per_bitmap;
+  page_id_t bitmap_physical_id = 1 + MapPageId(logical_page_id) / pages_per_extent;
+  ReadPhysicalPage(bitmap_physical_id, bitmap);
+  BitmapPage<PAGE_SIZE> *bitmap_page = reinterpret_cast<BitmapPage<PAGE_SIZE> *>(bitmap);
+
+  bitmap_page->DeAllocatePage(logical_page_id % pages_per_bitmap);
+
+  // 修改meta_data
+  uint32_t extent_id = logical_page_id / pages_per_bitmap;
+  if (--meta_page->extent_used_page_[extent_id] == 0) meta_page->num_extents_--;
+
+  meta_page->num_allocated_pages_--;
+  WritePage(META_PAGE_ID, meta_data_);
 }
 
 bool DiskManager::IsPageFree(page_id_t logical_page_id) {
-//  page_id_t physical_page_id = MapPageId(logical_page_id);
-//  if ( meta_data_[physical_page_id/8] & (0x80>>(physical_page_id%8)) )  return false;
-//  if (logical_page_id < 0)
-  DiskFileMetaPage *meta_page = reinterpret_cast<DiskFileMetaPage *>(meta_data_);
-  return !(meta_page->GetAllocatedPages() >= uint32_t(logical_page_id )+1);
+  // 判断对应的bitmap中那一bit是0还是1
+  // 读取对应的bitmap
+  char bitmap[PAGE_SIZE];
+  size_t pages_per_bitmap = BitmapPage<PAGE_SIZE>::GetMaxSupportedSize();
+  size_t pages_per_extent = 1 + pages_per_bitmap;
+  page_id_t bitmap_physical_id = 1 + MapPageId(logical_page_id) / pages_per_extent;
+  ReadPhysicalPage(bitmap_physical_id, bitmap);
+
+  BitmapPage<PAGE_SIZE> *bitmap_page = reinterpret_cast<BitmapPage<PAGE_SIZE> *>(bitmap);
+  // 判断
+  if (bitmap_page->IsPageFree(logical_page_id % pages_per_bitmap)) return true;
+  return false;
 }
 
 page_id_t DiskManager::MapPageId(page_id_t logical_page_id) {
+  size_t max_size_of_bitmap = BitmapPage<PAGE_SIZE>::GetMaxSupportedSize();
+  //  auto num_pages = bitmap->GetMaxSupportedSize();
   DiskFileMetaPage *meta_page = reinterpret_cast<DiskFileMetaPage *>(meta_data_);
-  //logical_page_id = physical_page_id - 1 - number_of_bitmap
-  page_id_t physical_page_id = logical_page_id + 1 + meta_page->GetExtentNums();
-
-  return physical_page_id;
+  // logical_page_id = physical_page_id - 1 - number_of_bitmap
+  int32_t extent_num_before = 1 + logical_page_id / max_size_of_bitmap;
+  return logical_page_id + 1 + extent_num_before;
 }
 
 int DiskManager::GetFileSize(const std::string &file_name) {
