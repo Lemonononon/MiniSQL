@@ -33,19 +33,19 @@ uint32_t Schema::DeserializeFrom(char *buf, Schema *&schema, MemHeap *heap) {
   ASSERT(MACH_READ_UINT32(buf)==200715,"Not A Schema");
   ofs+=4;
   buf+=4;
-  //在heap中返回新生成的对象
-  schema = ALLOC_P(heap, Schema)(schema->columns_);
-  //read column size
-  uint32_t len = MACH_READ_UINT32(buf);
-  buf+=4;
+  //read size of cols
+  uint32_t size = MACH_READ_UINT32(buf);
   ofs+=4;
-  //read pointer one by one
-  for(uint32_t i=0;i<len;i++){
-    const Column * p = MACH_READ_FROM(Column *,buf);
-    schema->columns_.size();
-    schema->columns_.push_back();
+  buf+=4;
+  //利用buf内数据先创造一个schema,再将此schema返回 模仿了schema.h 中的deep copy schema
+  std::vector<Column *> cols;
+  for(uint32_t i=0;i<size;i++){
+    void * buffer  = heap->Allocate(sizeof(Column));
+    cols.push_back(new(buffer)Column(MACH_READ_FROM(Column *,buf)));
+    buf+=8;
+    ofs+=8;
   }
-
-
+  void * buffer = heap->Allocate(sizeof(schema));
+  schema = new(buffer)Schema(cols);
   return ofs;
 }
