@@ -35,7 +35,7 @@ Column::Column(const Column *other)
 
 uint32_t Column::SerializeTo(char *buf) const {
   // replace with your code here
-  // bool由于大小为1位，被我当作char存了
+  // bool大小也是1 byte
   // 写入的顺序以及字节大小：
   // 1.magic_num 4 2.SerializeSize 4 3.name长度 4 4.name实际数据 name.size()*1 5.type_id(enum类型实际都是int) 4
   // 6.len_ 4      7.table_ind_ 4 8.nullable_ 1 9.unique_ 1
@@ -65,11 +65,11 @@ uint32_t Column::SerializeTo(char *buf) const {
   ofs += 4;
   buf += 4;
   // write nullable_
-  MACH_WRITE_TO(char, buf, nullable_);
+  MACH_WRITE_TO(bool, buf, nullable_);
   buf++;
   ofs++;
   // write unique_
-  MACH_WRITE_TO(char, buf, unique_);
+  MACH_WRITE_TO(bool, buf, unique_);
   buf++;
   ofs++;
   return ofs;
@@ -92,7 +92,7 @@ uint32_t Column::DeserializeFrom(char *buf, Column *&column, MemHeap *heap) {
   // test if empty
   ASSERT(column == nullptr, "Pointer to column is not null in column deserialize.");
   //在heap中返回新生成的对象
-  ALLOC_P(heap, Column)(column->name_, column->type_, column->table_ind_, column->nullable_, column->unique_);
+  column=ALLOC_P(heap, Column)(column->name_, column->type_, column->table_ind_, column->nullable_, column->unique_);
   /* deserialize field from buf */
   //read name length
   uint32_t len = MACH_READ_UINT32(buf);
