@@ -43,6 +43,6 @@ uint32_t Schema::DeserializeFrom(char *buf, Schema *&schema, MemHeap *heap) {
     buf+=8;
     ofs+=8;
   }
-  ALLOC_P(heap,Schema)(schema->columns_);
+  schema = ALLOC_P(heap,Schema)(schema->columns_);
   return ofs;
 }

@@ -125,7 +125,7 @@ uint32_t Column::DeserializeFrom(char *buf, Column *&column, MemHeap *heap) {
   buf++;
   ofs++;
   // 将新生成的对象放到heap中
-  ALLOC_P(heap, Column)
+  column=ALLOC_P(heap, Column)
   (column->name_, column->type_, column->len_, column->table_ind_, column->nullable_, column->unique_);
   // return ofs
   return ofs;
