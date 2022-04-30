@@ -37,8 +37,8 @@ uint32_t Column::SerializeTo(char *buf) const {
   // replace with your code here
   // bool大小也是1 byte
   // 写入的顺序以及字节大小：
-  // 1.magic_num 4 2.SerializeSize 4 3.name长度 4 4.name实际数据 name.size()*1 5.type_id(enum类型实际都是int) 4
-  // 6.len_ 4      7.table_ind_ 4 8.nullable_ 1 9.unique_ 1
+  // 1.magic_num 4 2.name长度 4 3.name实际数据 name.size()*1 4.type_id(enum类型实际都是int) 4
+  // 5.len_ 4      6.table_ind_ 4 7.nullable_ 1 8.unique_ 1
 
   uint32_t ofs = 0;
   // write magic number
@@ -78,49 +78,55 @@ uint32_t Column::SerializeTo(char *buf) const {
 uint32_t Column::GetSerializedSize() const {
   // replace with your code here
   // 具体见SerializeTo
-  return MACH_STR_SERIALIZED_SIZE(name_)+22;
+  return MACH_STR_SERIALIZED_SIZE(name_) + 22;
 }
 
 uint32_t Column::DeserializeFrom(char *buf, Column *&column, MemHeap *heap) {
   // replace with your code here
-  //read magic number
-  uint32_t ofs = 0;
-  uint32_t mag = MACH_READ_UINT32(buf);
-  ASSERT(mag==210928,"Not Column!");
-  buf+=4;
-  ofs+=4;
+
   // test if empty
   ASSERT(column == nullptr, "Pointer to column is not null in column deserialize.");
-  //在heap中返回新生成的对象
-  column=ALLOC_P(heap, Column)(column->name_, column->type_, column->table_ind_, column->nullable_, column->unique_);
+  // read magic number
+  uint32_t ofs = 0;
+  uint32_t mag = MACH_READ_UINT32(buf);
+  ASSERT(mag == 210928, "Not Column!");
+  buf += 4;
+  ofs += 4;
   /* deserialize field from buf */
-  //read name length
+  // read name length
   uint32_t len = MACH_READ_UINT32(buf);
-  buf+=4;
-  ofs+=4;
-  //read name one char by one char
+  buf += 4;
+  ofs += 4;
+  // read name one char by one char
   column->name_ = new char[len];
-  for(uint32_t i=0;i<len;i++){
-    column->name_[i]=MACH_READ_FROM(char,buf);
+  for (uint32_t i = 0; i < len; i++) {
+    column->name_[i] = MACH_READ_FROM(char, buf);
     buf++;
     ofs++;
   }
-  //read len_
+  // read type
+  column->type_ = MACH_READ_FROM(TypeId, buf);
+  buf += 4;
+  ofs += 4;
+  // read len_
   column->len_ = MACH_READ_UINT32(buf);
-  buf+=4;
-  ofs+=4;
-  //read table_ind
+  buf += 4;
+  ofs += 4;
+  // read table_ind
   column->table_ind_ = MACH_READ_UINT32(buf);
-  buf+=4;
-  ofs+=4;
-  //read nullable. bool and char are both 1 byte, so we can just read one char
-  column->nullable_ = MACH_READ_FROM(char,buf);
+  buf += 4;
+  ofs += 4;
+  // read nullable. bool and char are both 1 byte, so we can just read one char
+  column->nullable_ = MACH_READ_FROM(bool, buf);
   buf++;
   ofs++;
-  //read unique. bool and char are both 1 byte, so we can just read one char
-  column->unique_ = MACH_READ_FROM(char,buf);
+  // read unique. bool and char are both 1 byte, so we can just read one char
+  column->unique_ = MACH_READ_FROM(bool, buf);
   buf++;
   ofs++;
-  //return ofs
+  // 将新生成的对象放到heap中
+  ALLOC_P(heap, Column)
+  (column->name_, column->type_, column->len_, column->table_ind_, column->nullable_, column->unique_);
+  // return ofs
   return ofs;
 }

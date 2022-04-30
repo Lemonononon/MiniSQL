@@ -37,15 +37,12 @@ uint32_t Schema::DeserializeFrom(char *buf, Schema *&schema, MemHeap *heap) {
   uint32_t size = MACH_READ_UINT32(buf);
   ofs+=4;
   buf+=4;
-  //利用buf内数据先创造一个schema,再将此schema返回 模仿了schema.h 中的deep copy schema
-  std::vector<Column *> cols;
+  //利用buf内数据赋值给schema,再将schema放入heap
   for(uint32_t i=0;i<size;i++){
-    void * buffer  = heap->Allocate(sizeof(Column));
-    cols.push_back(new(buffer)Column(MACH_READ_FROM(Column *,buf)));
+    schema->columns_.emplace_back((Column *) MACH_READ_FROM(Column *,buf));//emplace_back is push_back with judge
     buf+=8;
     ofs+=8;
   }
-  void * buffer = heap->Allocate(sizeof(schema));
-  schema = new(buffer)Schema(cols);
+  ALLOC_P(heap,Schema)(schema->columns_);
   return ofs;
 }
