@@ -113,7 +113,7 @@ bool DiskManager::IsPageFree(page_id_t logical_page_id) {
 page_id_t DiskManager::MapPageId(page_id_t logical_page_id) {
   size_t max_size_of_bitmap = BitmapPage<PAGE_SIZE>::GetMaxSupportedSize();
   //  auto num_pages = bitmap->GetMaxSupportedSize();
-  DiskFileMetaPage *meta_page = reinterpret_cast<DiskFileMetaPage *>(meta_data_);
+  // DiskFileMetaPage *meta_page = reinterpret_cast<DiskFileMetaPage *>(meta_data_);
   // logical_page_id = physical_page_id - 1 - number_of_bitmap
   int32_t extent_num_before = 1 + logical_page_id / max_size_of_bitmap;
   return logical_page_id + 1 + extent_num_before;
