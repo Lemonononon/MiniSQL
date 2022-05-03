@@ -45,13 +45,13 @@ void DiskManager::WritePage(page_id_t logical_page_id, const char *page_data) {
 page_id_t DiskManager::AllocatePage() {
   //  ASSERT(false, "Not implemented yet.");
   //  return INVALID_PAGE_ID;
-//  ReadPhysicalPage(META_PAGE_ID,meta_data_);
-  DiskFileMetaPage *meta_page = reinterpret_cast<DiskFileMetaPage *>(GetMetaData());
-  size_t page_id;
+  uint32_t meta_data_uint[PAGE_SIZE/4];
+  memcpy(meta_data_uint, meta_data_, 4096);
 
+  size_t page_id;
   // 寻找第一个没有满额的extent
   uint32_t extent_id = 0;
-  while (meta_page->GetExtentUsedPage(extent_id) == BITMAP_SIZE) {
+  while (  *(meta_data_uint+2+extent_id) == BITMAP_SIZE) {
     extent_id++;
   };
   // 读取对应extent的bitmap_page，寻找第一个free的page
@@ -60,38 +60,23 @@ page_id_t DiskManager::AllocatePage() {
   ReadPhysicalPage(bitmap_physical_id, bitmap);
 
   BitmapPage<PAGE_SIZE> *bitmap_page = reinterpret_cast<BitmapPage<PAGE_SIZE> *>(bitmap);
-//  std::cout << "next_free_page: " << bitmap_page->GetNextFreePage() << std::endl;
   uint32_t next_free_page = bitmap_page->GetNextFreePage();
-//  uint32_t free_page_id = 0;
-//  while ( !bitmap_page->IsPageFree(free_page_id) && free_page_id < BITMAP_SIZE ) free_page_id++;
-//  bitmap_page->AllocatePage(free_page_id);
-
   page_id = extent_id * BITMAP_SIZE + next_free_page;
-  std::cout<<"extent_id: "<< extent_id << std::endl;
-  std::cout<<"free_page_id: "<< next_free_page << std::endl;
-  std::cout<<"page_id: "<< page_id << std::endl;
+
+  bitmap_page->AllocatePage(next_free_page);
   // 修改meta_data
-  if (extent_id >= meta_page->num_extents_) {
-    DiskFileMetaPage *tmp = meta_page;
-    // 开辟一个新的extent
-    size_t len = sizeof(meta_page->extent_used_page_)/ sizeof(meta_page->extent_used_page_[0]) + 1;
-    DiskFileMetaPage *metaPage =
-//    int arr1[5]={1,2,3,4,5};
-//    int arr2[10]={0};
-//    memcpy(arr2,arr1,sizeof(arr1));
-    meta_page->num_extents_ += 1;
-    meta_page->extent_used_page_[extent_id]++;
-  }
-  meta_page->num_allocated_pages_++;
+  if (extent_id >= *(meta_data_uint+1)) ++ *(meta_data_uint+1);
+  ++ *(meta_data_uint+2+extent_id);
+  ++ *(meta_data_uint);
+
+  memcpy(meta_data_,meta_data_uint, 4096);
   WritePage(META_PAGE_ID, meta_data_);
+  WritePhysicalPage(bitmap_physical_id, bitmap);
   return page_id;
-  // TODO:暂时未考虑溢出问题
 }
 
 void DiskManager::DeAllocatePage(page_id_t logical_page_id) {
   //  ASSERT(false, "Not implemented yet.");
-  DiskFileMetaPage *meta_page = reinterpret_cast<DiskFileMetaPage *>(meta_data_);
-
   char bitmap[PAGE_SIZE];
   size_t pages_per_extent = 1 + BITMAP_SIZE;
   page_id_t bitmap_physical_id = 1 + MapPageId(logical_page_id) / pages_per_extent;
@@ -100,12 +85,15 @@ void DiskManager::DeAllocatePage(page_id_t logical_page_id) {
 
   bitmap_page->DeAllocatePage(logical_page_id % BITMAP_SIZE);
 
-  // 修改meta_data
+  uint32_t meta_data_uint[PAGE_SIZE/4];
+//   修改meta_data
   uint32_t extent_id = logical_page_id / BITMAP_SIZE;
-  if (--meta_page->extent_used_page_[extent_id] == 0) meta_page->num_extents_--;
+  if (-- *(meta_data_uint + 2 + extent_id) == 0) -- *( meta_data_uint + 1 );
+  -- *(meta_data_uint);
 
-  meta_page->num_allocated_pages_--;
+  memcpy(meta_data_,meta_data_uint, 4096);
   WritePage(META_PAGE_ID, meta_data_);
+  WritePhysicalPage(bitmap_physical_id, bitmap);
 }
 
 bool DiskManager::IsPageFree(page_id_t logical_page_id) {
