@@ -57,6 +57,7 @@ public:
     }
     rid_ = other.rid_;
     for (auto &field : other.fields_) {
+
       void *buf = heap_->Allocate(sizeof(Field));
       fields_.push_back(new(buf)Field(*field));
     }

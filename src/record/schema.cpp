@@ -22,8 +22,8 @@ uint32_t Schema::SerializeTo(char *buf) const {
 
 uint32_t Schema::GetSerializedSize() const {
   // replace with your code here
-  //magic number(4 byte) + pointers in columns_(8 byte one pointer)
-  return 4+8*columns_.size();
+  //magic number(4 byte) + column size(4 byte) + pointers in columns_(8 byte one pointer)
+  return 8+8*columns_.size();
 }
 
 uint32_t Schema::DeserializeFrom(char *buf, Schema *&schema, MemHeap *heap) {
