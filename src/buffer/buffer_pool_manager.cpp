@@ -44,15 +44,17 @@ Page *BufferPoolManager::FetchPage(page_id_t page_id) {
       free_page_index = free_list_.back();
       free_list_.pop_back();
     } else if (replacer_->Size() > 0) {
-      frame_id_t *free_frame_receiver = nullptr;
+      frame_id_t *free_frame_receiver = new frame_id_t;
       replacer_->Victim(free_frame_receiver);
       free_page_index = *free_frame_receiver;
+      delete free_frame_receiver;
     } else {
       return nullptr;
     }
     // TODO: 1.dirty的判定，什么时候dirty? => 在UnpinPage时，由调用者传入是否dirty，因为可能有多个调用者，所以应该用一个或关系
     //       2.既然有dirty，那么这个page在buffer中的写又在哪里实现? =>
     //       返回的是Page*，而Page类中GetData可以获取data的指针，从指针修改写入即可
+    printf("%d\n", pages_[free_page_index].page_id_);
     if (pages_[free_page_index].is_dirty_) {
       disk_manager_->WritePage(pages_[free_page_index].page_id_, pages_[free_page_index].data_);
     }
@@ -64,7 +66,9 @@ Page *BufferPoolManager::FetchPage(page_id_t page_id) {
     pages_[free_page_index].is_dirty_ = false;
     pages_[free_page_index].page_id_ = page_id;
     page_table_[page_id] = free_page_index;
+    printf("从磁盘读\n");
     disk_manager_->ReadPage(page_id, pages_[free_page_index].data_);
+    printf("%s\n", pages_[free_page_index].data_);
     replacer_->Pin(free_page_index);
     pages_[free_page_index].pin_count_++;
     return pages_ + free_page_index;
@@ -82,19 +86,35 @@ Page *BufferPoolManager::NewPage(page_id_t &page_id) {
     free_page_index = free_list_.back();
     free_list_.pop_back();
   } else if (replacer_->Size() > 0) {
-    frame_id_t *free_frame_receiver = nullptr;
+    frame_id_t *free_frame_receiver = new frame_id_t;
     replacer_->Victim(free_frame_receiver);
     free_page_index = *free_frame_receiver;
+    delete free_frame_receiver;
   } else {
     return nullptr;
   }
+  printf("%d\n", pages_[free_page_index].page_id_);
+  printf("写入%s\n", pages_[free_page_index].data_);
   if (pages_[free_page_index].is_dirty_) {
     disk_manager_->WritePage(pages_[free_page_index].page_id_, pages_[free_page_index].data_);
+    printf("从磁盘读\n");
+    disk_manager_->ReadPage(pages_[free_page_index].page_id_, pages_[free_page_index].data_);
+    printf("%s\n", pages_[free_page_index].data_);
   }
   // 更新page_table_，更新pages_中的那一页page
   page_table_.erase(pages_[free_page_index].page_id_);
   // 从disk中分配一个新的page_id，传进引用
+  if (pages_[free_page_index].is_dirty_) {
+    printf("alloc前从磁盘读\n");
+    disk_manager_->ReadPage(pages_[free_page_index].page_id_, pages_[free_page_index].data_);
+    printf("%s\n", pages_[free_page_index].data_);
+  }
   page_id = AllocatePage();
+  if (pages_[free_page_index].is_dirty_) {
+    printf("alloc后从磁盘读\n");
+    disk_manager_->ReadPage(pages_[free_page_index].page_id_, pages_[free_page_index].data_);
+    printf("%s\n", pages_[free_page_index].data_);
+  }
   // Page对象里设置了不允许复制，也即重载了运算符=
   //    pages_[free_page_index] = Page();
   pages_[free_page_index].ResetMemory();
@@ -135,8 +155,14 @@ bool BufferPoolManager::UnpinPage(page_id_t page_id, bool is_dirty) {
 }
 
 bool BufferPoolManager::FlushPage(page_id_t page_id) {
+//  printf("将page%d从buffer写入磁盘\n", page_id);
   if (page_table_.find(page_id) == page_table_.end()) return false;
+  if (page_id == 0) {
+    printf("写入%s\n", pages_[page_table_[page_id]].data_);
+  }
   disk_manager_->WritePage(page_id, pages_[page_table_[page_id]].data_);
+  pages_[page_table_[page_id]].is_dirty_ = false;
+//  printf("写入成功\n");
   return true;
 }
 
