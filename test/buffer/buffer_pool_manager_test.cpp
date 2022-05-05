@@ -55,25 +55,13 @@ TEST(BufferPoolManagerTest, BinaryDataTest) {
     EXPECT_EQ(true, bpm->UnpinPage(i, true));
     EXPECT_TRUE(bpm->FlushPage(i));
   }
-//  disk_manager->ReadPage(0, tmp);
-//  printf("%s\n", tmp);
   for (int i = 0; i < 5; ++i) {
-//    printf("%d\n", i);
-//    disk_manager->ReadPage(0, tmp);
-//    printf("%s\n", tmp);
     EXPECT_NE(nullptr, bpm->NewPage(page_id_temp));
     EXPECT_EQ(buffer_pool_size + i, page_id_temp);
-//    disk_manager->ReadPage(0, tmp);
-//    printf("写后读%s\n", tmp);
     bpm->UnpinPage(page_id_temp, false);
   }
-//  disk_manager->ReadPage(0, tmp);
-//  printf("%s\n", tmp);
-//  printf("ok\n");
   // Scenario: We should be able to fetch the data we wrote a while ago.
   page0 = bpm->FetchPage(0);
-//  printf("%s\n", random_binary_data);
-//  printf("%s\n", page0->GetData());
   EXPECT_EQ(0, memcmp(page0->GetData(), random_binary_data, PAGE_SIZE));
   EXPECT_EQ(true, bpm->UnpinPage(0, true));
 

@@ -70,7 +70,7 @@ page_id_t DiskManager::AllocatePage() {
   ++ *(meta_data_uint);
 
   memcpy(meta_data_,meta_data_uint, 4096);
-  WritePage(META_PAGE_ID, meta_data_);
+  WritePhysicalPage(META_PAGE_ID, meta_data_);
   WritePhysicalPage(bitmap_physical_id, bitmap);
   return page_id;
 }
@@ -92,7 +92,7 @@ void DiskManager::DeAllocatePage(page_id_t logical_page_id) {
   -- *(meta_data_uint);
 
   memcpy(meta_data_,meta_data_uint, 4096);
-  WritePage(META_PAGE_ID, meta_data_);
+  WritePhysicalPage(META_PAGE_ID, meta_data_);
   WritePhysicalPage(bitmap_physical_id, bitmap);
 }
 
