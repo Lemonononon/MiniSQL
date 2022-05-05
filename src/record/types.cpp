@@ -17,10 +17,10 @@ inline int CompareStrings(const char *str1, int len1, const char *str2, int len2
 // ==============================Type=============================
 
 Type *Type::type_singletons_[] = {
-        new Type(TypeId::kTypeInvalid),
-        new TypeInt(),
-        new TypeFloat(),
-        new TypeChar()
+    new Type(TypeId::kTypeInvalid),
+    new TypeInt(),
+    new TypeFloat(),
+    new TypeChar()
 };
 
 uint32_t Type::SerializeTo(const Field &field, char *buf) const {
