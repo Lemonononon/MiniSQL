@@ -7,10 +7,6 @@ uint32_t Row::SerializeTo(char *buf, Schema *schema) const {
     return 0;
   }
   uint32_t ofs = 0;
-  // write rowid
-  MACH_WRITE_TO(RowId, buf, rid_);
-  ofs += sizeof(RowId);
-  buf += sizeof(RowId);
   // write fields num
   MACH_WRITE_UINT32(buf, fields_.size());
   ofs += 4;
