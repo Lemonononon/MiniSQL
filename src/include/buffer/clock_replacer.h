@@ -6,11 +6,13 @@
 #include "buffer/replacer.h"
 #include <vector>
 #include <unordered_map>
+#include <iostream>
 
 using namespace std;
 
 //用来储存一个ClockNode
 struct ClockNode{
+ public:
   //该节点目前是否已经启用
   bool isNull = true;
   //该节点的时钟状态
@@ -44,8 +46,8 @@ class ClockReplacer : public Replacer {
 
  private:
   // add your own private member variables here
-  //Clock的节点vector
-  vector<cnode> nodes;
+  //Clock的节点数组
+  cnode* nodes;
   //clock指向的当前的下标
   size_t hand;
 

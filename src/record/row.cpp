@@ -47,7 +47,7 @@ uint32_t Row::DeserializeFrom(char *buf, Schema *schema) {
   // replace with your code here
   // read fields num
   uint32_t ofs = 0;
-  RowId id = MACH_READ_FROM(RowId, buf);
+  [[maybe_unused]]RowId id = MACH_READ_FROM(RowId, buf);
   buf += sizeof(RowId);
   ofs += sizeof(RowId);
   // read null bitmap
