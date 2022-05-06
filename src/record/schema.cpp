@@ -22,27 +22,28 @@ uint32_t Schema::SerializeTo(char *buf) const {
 
 uint32_t Schema::GetSerializedSize() const {
   // replace with your code here
-  //magic number(4 byte) + column size(4 byte) + pointers in columns_(8 byte one pointer)
-  return 8+8*columns_.size();
+  // magic number(4 byte) + column size(4 byte) + pointers in columns_(8 byte one pointer)
+  return 8 + 8 * columns_.size();
 }
 
 uint32_t Schema::DeserializeFrom(char *buf, Schema *&schema, MemHeap *heap) {
   // replace with your code here
-  uint32_t ofs=0;
-  //read magic number
-  ASSERT(MACH_READ_UINT32(buf)==200715,"Not A Schema");
-  ofs+=4;
-  buf+=4;
-  //read size of cols
+  uint32_t ofs = 0;
+  // read magic number
+  ASSERT(MACH_READ_UINT32(buf) == 200715, "Not A Schema");
+  ofs += 4;
+  buf += 4;
+  // read size of cols
   uint32_t size = MACH_READ_UINT32(buf);
-  ofs+=4;
-  buf+=4;
-  //利用buf内数据赋值给schema,再将schema放入heap
-  for(uint32_t i=0;i<size;i++){
-    schema->columns_.emplace_back((Column *) MACH_READ_FROM(Column *,buf));//emplace_back is push_back with judge
-    buf+=8;
-    ofs+=8;
+  ofs += 4;
+  buf += 4;
+  // 利用buf内数据赋值给schema,再将schema放入heap
+  std::vector<Column *> c;
+  for (uint32_t i = 0; i < size; i++) {
+    c.emplace_back((Column *)MACH_READ_FROM(Column *, buf));  // emplace_back is push_back with judge
+    buf += 8;
+    ofs += 8;
   }
-  schema = ALLOC_P(heap,Schema)(schema->columns_);
+  schema = ALLOC_P(heap, Schema)(c);
   return ofs;
 }

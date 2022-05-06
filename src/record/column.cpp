@@ -34,7 +34,6 @@ Column::Column(const Column *other)
       unique_(other->unique_) {}
 
 uint32_t Column::SerializeTo(char *buf) const {
-  // replace with your code here
   // bool大小也是1 byte
   // 写入的顺序以及字节大小：
   // 1.magic_num 4 2.name长度 4 3.name实际数据 name.size()*1 4.type_id(enum类型实际都是int) 4
@@ -98,35 +97,36 @@ uint32_t Column::DeserializeFrom(char *buf, Column *&column, MemHeap *heap) {
   buf += 4;
   ofs += 4;
   // read name one char by one char
-  column->name_ = new char[len];
+  char *name = new char[len];
+  ofs += len;
   for (uint32_t i = 0; i < len; i++) {
-    column->name_[i] = MACH_READ_FROM(char, buf);
+    name[i] = MACH_READ_FROM(char, buf);
     buf++;
-    ofs++;
   }
+  std::string column_name (name);
   // read type
-  column->type_ = MACH_READ_FROM(TypeId, buf);
+  TypeId type = MACH_READ_FROM(TypeId, buf);
   buf += 4;
   ofs += 4;
   // read len_
-  column->len_ = MACH_READ_UINT32(buf);
+  uint32_t l = MACH_READ_UINT32(buf);
   buf += 4;
   ofs += 4;
   // read table_ind
-  column->table_ind_ = MACH_READ_UINT32(buf);
+  uint32_t col_ind = MACH_READ_UINT32(buf);
   buf += 4;
   ofs += 4;
   // read nullable. bool and char are both 1 byte, so we can just read one char
-  column->nullable_ = MACH_READ_FROM(bool, buf);
+  bool Nullable = MACH_READ_FROM(bool, buf);
   buf++;
   ofs++;
   // read unique. bool and char are both 1 byte, so we can just read one char
-  column->unique_ = MACH_READ_FROM(bool, buf);
+  bool uni = MACH_READ_FROM(bool, buf);
   buf++;
   ofs++;
   // 将新生成的对象放到heap中
-  column=ALLOC_P(heap, Column)
-  (column->name_, column->type_, column->len_, column->table_ind_, column->nullable_, column->unique_);
+  column = ALLOC_P(heap, Column)(column_name, type, l, col_ind, Nullable,
+                                 uni);
   // return ofs
   return ofs;
 }
