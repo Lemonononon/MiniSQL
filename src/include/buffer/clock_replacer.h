@@ -47,7 +47,7 @@ class ClockReplacer : public Replacer {
  private:
   // add your own private member variables here
   //Clock的节点数组
-  cnode* nodes;
+  vector<cnode> nodes;
   //clock指向的当前的下标
   size_t hand;
 
