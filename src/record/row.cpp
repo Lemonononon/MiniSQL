@@ -39,10 +39,7 @@ uint32_t Row::SerializeTo(char *buf, Schema *schema) const {
       ofs += t;
     }
   }
-  // write heap_
-  MACH_WRITE_TO(MemHeap *, buf, heap_);
-  ofs += sizeof(MemHeap *);
-  buf += sizeof(MemHeap *);
+
   return ofs;
 }
 
