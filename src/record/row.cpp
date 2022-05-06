@@ -47,11 +47,11 @@ uint32_t Row::DeserializeFrom(char *buf, Schema *schema) {
   // replace with your code here
   // read fields num
   uint32_t ofs = 0;
-  [[maybe_unused]]RowId id = MACH_READ_FROM(RowId, buf);
-  buf += sizeof(RowId);
-  ofs += sizeof(RowId);
+  uint32_t field_num = MACH_READ_UINT32(buf);
+  buf += 4;
+  ofs += 4;
   // read null bitmap
-  uint32_t size = (fields_.size() / 8 + 1) * 8;
+  uint32_t size = (field_num / 8 + 1) * 8;
   uint32_t map_num = 0;
   uint32_t map[size];
   while (map_num < size / 8) {
@@ -67,13 +67,12 @@ uint32_t Row::DeserializeFrom(char *buf, Schema *schema) {
     map_num++;
   }
   // deserialize
-  for (uint32_t i = 0; i < fields_.size(); i++) {
+  for (uint32_t i = 0; i < field_num; i++) {
     if (map[i] == 0) {
       uint32_t t = fields_[i]->DeserializeFrom(buf, schema->GetColumn(i)->GetType(), &fields_[i], true, heap_);
       ofs += t;
       buf += t;
-    }
-    else{
+    } else {
       uint32_t t = fields_[i]->DeserializeFrom(buf, schema->GetColumn(i)->GetType(), &fields_[i], false, heap_);
       ofs += t;
       buf += t;
@@ -89,13 +88,13 @@ uint32_t Row::GetSerializedSize(Schema *schema) const {
   if (fields_.size() == 0) {
     return 0;
   }
-  uint32_t sum=0;
-  //header size
-  sum+=4 + (fields_.size() / 8 + 1);
-  //fields
-  for(uint32_t i=0;i<fields_.size();i++){
-    if(fields_[i]->IsNull()!=0){
-      sum+= fields_[i]->GetSerializedSize();
+  uint32_t sum = 0;
+  // header size
+  sum += 4 + (fields_.size() / 8 + 1);
+  // fields
+  for (uint32_t i = 0; i < fields_.size(); i++) {
+    if (fields_[i]->IsNull() != 0) {
+      sum += fields_[i]->GetSerializedSize();
     }
   }
   return sum;
