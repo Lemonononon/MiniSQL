@@ -3,11 +3,12 @@
 using namespace std;
 
 ClockReplacer::ClockReplacer(size_t num_pages) {
-  nodes = vector<cnode>(num_pages);
+  hand = 0;
   num_page = num_pages;
+  nodes = new cnode[num_page];
 }
 
-ClockReplacer::~ClockReplacer(){ nodes.clear();};
+ClockReplacer::~ClockReplacer() = default;
 
 bool ClockReplacer::Victim(frame_id_t *frame_id) {
   cout<<"Victim Called"<<endl;
@@ -76,7 +77,7 @@ void ClockReplacer::Unpin(frame_id_t frame_id) {
 size_t ClockReplacer::Size() {
   //count所有isNull==false的点的数量
   int count = 0;
-  for(size_t i = 0; i < nodes.size(); i++)
+  for(size_t i = 0; i < num_page; i++)
     if(!nodes[i].isNull) count++;
   return count;
 }
@@ -93,7 +94,7 @@ size_t ClockReplacer::Find(frame_id_t frame_id) {
 
 //找到第一个Null的node
 size_t ClockReplacer::FindNull() {
-  for(size_t i = 0; i < nodes.size(); i++)
+  for(size_t i = 0; i < num_page; i++)
     if(nodes[i].isNull) return i;
   return -1;
 }
@@ -134,6 +135,6 @@ void ClockReplacer::Test(size_t num) {
     cout << "vector" << i << " page: " << nodes[i].frame_id << " isNull: " << nodes[i].isNull<< " status: "
          << nodes[i].node_status<<endl;
   }
-  cout << "vectorSize: " << nodes.size() << endl;
+  cout << "vectorSize: " << num_page << endl;
   cout << endl;
 }
