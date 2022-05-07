@@ -159,9 +159,7 @@ bool TablePage::GetTuple(Row *row, Schema *schema, Transaction *txn, LockManager
   // At this point, we have at least a shared lock on the RID. Copy the tuple data into our result.
   uint32_t tuple_offset = GetTupleOffsetAtSlot(slot_num);
   uint32_t __attribute__((unused)) read_bytes = row->DeserializeFrom(GetData() + tuple_offset, schema);
-  printf("1 2");
   ASSERT(tuple_size == read_bytes, "Unexpected behavior in tuple deserialize.");
-  std::cout<<row->GetField(0)->IsNull()<<std::endl;
   return true;
 }
 
