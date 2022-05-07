@@ -1,6 +1,6 @@
+#include "page/b_plus_tree_internal_page.h"
 #include "index/basic_comparator.h"
 #include "index/generic_key.h"
-#include "page/b_plus_tree_internal_page.h"
 
 //****************************HELPER METHODS AND UTILITIES***************************
 
@@ -11,11 +11,11 @@
  */
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_INTERNAL_PAGE_TYPE::Init(page_id_t page_id, page_id_t parent_id, int max_size) {
-    SetPageId(page_id);
-    SetParentPageId(parent_id);
-    SetMaxSize(max_size);
-    SetSize(1);
-    SetPageType(IndexPageType::INTERNAL_PAGE);
+  SetPageId(page_id);
+  SetParentPageId(parent_id);
+  SetMaxSize(max_size);
+  SetSize(1);
+  SetPageType(IndexPageType::INTERNAL_PAGE);
 }
 /*
  * Helper method to get/set the key associated with input "index"(a.k.a
@@ -29,9 +29,7 @@ KeyType B_PLUS_TREE_INTERNAL_PAGE_TYPE::KeyAt(int index) const {
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-void B_PLUS_TREE_INTERNAL_PAGE_TYPE::SetKeyAt(int index, const KeyType &key) {
-  array_[index].first = key;
-}
+void B_PLUS_TREE_INTERNAL_PAGE_TYPE::SetKeyAt(int index, const KeyType &key) { array_[index].first = key; }
 
 /*
  * Helper method to find and return array index(or offset), so that its value
@@ -40,12 +38,12 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::SetKeyAt(int index, const KeyType &key) {
  */
 INDEX_TEMPLATE_ARGUMENTS
 int B_PLUS_TREE_INTERNAL_PAGE_TYPE::ValueIndex(const ValueType &value) const {
-  for (int i=0;i<GetSize();i++) {
+  for (int i = 0; i < GetSize(); i++) {
     if (array_[i].second == value) {
       return i;
     }
   }
-  return -1;
+  return GetSize();
 }
 
 /*
@@ -73,10 +71,10 @@ ValueType B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key, const KeyCo
   for (int i = 1; i < GetSize(); ++i) {
     // array_[i].first > key
     if (comparator(array_[i].first, key) > 0) {
-      return array_[i-1].second;
+      return array_[i - 1].second;
     }
   }
-  return array_[GetSize()-1].second;
+  return array_[GetSize() - 1].second;
 }
 
 // *******************************INSERTION*************************************
@@ -112,8 +110,9 @@ int B_PLUS_TREE_INTERNAL_PAGE_TYPE::InsertNodeAfter(const ValueType &old_value, 
   int insertIndex = ValueIndex(old_value);
   int oriSize = GetSize();
   for (int i = insertIndex + 1; i < oriSize + 1; ++i) {
-    array_[i] = array_[i-1];
+    array_[i] = array_[i - 1];
   }
+  IncreaseSize(1);
   array_[insertIndex] = {new_key, new_value};
   return GetSize();
 }
@@ -127,7 +126,7 @@ INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveHalfTo(BPlusTreeInternalPage *recipient,
                                                 BufferPoolManager *buffer_pool_manager) {
   int halfSize = (GetSize()) + 1 / 2;
-  recipient->CopyNFrom(array_+GetSize()-halfSize, halfSize, buffer_pool_manager);
+  recipient->CopyNFrom(array_ + GetSize() - halfSize, halfSize, buffer_pool_manager);
   IncreaseSize(-halfSize);
 }
 
@@ -141,7 +140,7 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::CopyNFrom(MappingType *items, int size, Buf
   for (int i = 0; i < size; ++i) {
     array_[i] = items[i];
     auto page = buffer_pool_manager->FetchPage(items[i].second);
-    auto node = reinterpret_cast<BPlusTreePage*>(page->GetData());
+    auto node = reinterpret_cast<BPlusTreePage *>(page->GetData());
     node->SetParentPageId(GetPageId());
     buffer_pool_manager->UnpinPage(node->GetPageId(), true);
   }
@@ -158,7 +157,11 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::CopyNFrom(MappingType *items, int size, Buf
  */
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_INTERNAL_PAGE_TYPE::Remove(int index) {
-
+  // TODO: 作为类成员变量的柔性数组的内存是怎么申请，又怎么释放的？
+  for (int i = index; i < GetSize() - 1; ++i) {
+    array_[i] = array_[i + 1];
+  }
+  IncreaseSize(-1);
 }
 
 /*
@@ -168,8 +171,8 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::Remove(int index) {
 INDEX_TEMPLATE_ARGUMENTS
 ValueType B_PLUS_TREE_INTERNAL_PAGE_TYPE::RemoveAndReturnOnlyChild() {
   // replace with your own code
-  ValueType val{};
-  return val;
+  IncreaseSize(-1);
+  return ValueAt(0);
 }
 
 //******************************MERGE********************************
@@ -180,11 +183,20 @@ ValueType B_PLUS_TREE_INTERNAL_PAGE_TYPE::RemoveAndReturnOnlyChild() {
  * to make sure the middle key is added to the recipient to maintain the invariant.
  * You also need to use BufferPoolManager to persist changes to the parent page id for those
  * pages that are moved to the recipient
+ * 在节点需要和其他节点（不一定是兄弟）结合时会用到这个操作，因为internal的key是比value少一个的，结合的时候要去父亲那里把key搞回来
  */
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveAllTo(BPlusTreeInternalPage *recipient, const KeyType &middle_key,
                                                BufferPoolManager *buffer_pool_manager) {
-
+  SetKeyAt(0, middle_key);
+  recipient->CopyNFrom(array_, GetSize(), buffer_pool_manager);
+  // 更新disk中的pages的parent
+  for (int i = 0; i < GetSize(); ++i) {
+    auto page = buffer_pool_manager->FetchPage(ValueAt(i));
+    auto node = reinterpret_cast<BPlusTreePage *>(page->GetData());
+    node->SetParentPageId(recipient->GetParentPageId());
+    buffer_pool_manager->UnpinPage(ValueAt(i), true);
+  }
 }
 
 //********************************REDISTRIBUTE*************************************
@@ -199,18 +211,14 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveAllTo(BPlusTreeInternalPage *recipient,
  */
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveFirstToEndOf(BPlusTreeInternalPage *recipient, const KeyType &middle_key,
-                                                      BufferPoolManager *buffer_pool_manager) {
-
-}
+                                                      BufferPoolManager *buffer_pool_manager) {}
 
 /* Append an entry at the end.
  * Since it is an internal page, the moved entry(page)'s parent needs to be updated.
  * So I need to 'adopt' it by changing its parent page id, which needs to be persisted with BufferPoolManger
  */
 INDEX_TEMPLATE_ARGUMENTS
-void B_PLUS_TREE_INTERNAL_PAGE_TYPE::CopyLastFrom(const MappingType &pair, BufferPoolManager *buffer_pool_manager) {
-
-}
+void B_PLUS_TREE_INTERNAL_PAGE_TYPE::CopyLastFrom(const MappingType &pair, BufferPoolManager *buffer_pool_manager) {}
 
 /*
  * Remove the last key & value pair from this page to head of "recipient" page.
@@ -221,33 +229,23 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::CopyLastFrom(const MappingType &pair, Buffe
  */
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveLastToFrontOf(BPlusTreeInternalPage *recipient, const KeyType &middle_key,
-                                                       BufferPoolManager *buffer_pool_manager) {
-
-}
+                                                       BufferPoolManager *buffer_pool_manager) {}
 
 /* Append an entry at the beginning.
  * Since it is an internal page, the moved entry(page)'s parent needs to be updated.
  * So I need to 'adopt' it by changing its parent page id, which needs to be persisted with BufferPoolManger
  */
 INDEX_TEMPLATE_ARGUMENTS
-void B_PLUS_TREE_INTERNAL_PAGE_TYPE::CopyFirstFrom(const MappingType &pair, BufferPoolManager *buffer_pool_manager) {
+void B_PLUS_TREE_INTERNAL_PAGE_TYPE::CopyFirstFrom(const MappingType &pair, BufferPoolManager *buffer_pool_manager) {}
 
-}
+template class BPlusTreeInternalPage<int, int, BasicComparator<int>>;
 
-template
-class BPlusTreeInternalPage<int, int, BasicComparator<int>>;
+template class BPlusTreeInternalPage<GenericKey<4>, page_id_t, GenericComparator<4>>;
 
-template
-class BPlusTreeInternalPage<GenericKey<4>, page_id_t, GenericComparator<4>>;
+template class BPlusTreeInternalPage<GenericKey<8>, page_id_t, GenericComparator<8>>;
 
-template
-class BPlusTreeInternalPage<GenericKey<8>, page_id_t, GenericComparator<8>>;
+template class BPlusTreeInternalPage<GenericKey<16>, page_id_t, GenericComparator<16>>;
 
-template
-class BPlusTreeInternalPage<GenericKey<16>, page_id_t, GenericComparator<16>>;
+template class BPlusTreeInternalPage<GenericKey<32>, page_id_t, GenericComparator<32>>;
 
-template
-class BPlusTreeInternalPage<GenericKey<32>, page_id_t, GenericComparator<32>>;
-
-template
-class BPlusTreeInternalPage<GenericKey<64>, page_id_t, GenericComparator<64>>;
+template class BPlusTreeInternalPage<GenericKey<64>, page_id_t, GenericComparator<64>>;
