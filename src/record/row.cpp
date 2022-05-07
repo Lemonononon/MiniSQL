@@ -1,4 +1,6 @@
 #include "record/row.h"
+#include <iostream>
+using namespace std;
 
 uint32_t Row::SerializeTo(char *buf, Schema *schema) const {
   // replace with your code here
@@ -14,7 +16,8 @@ uint32_t Row::SerializeTo(char *buf, Schema *schema) const {
   ofs += 4;
   buf += 4;
   // write null bitmap
-  uint32_t size = (fields_.size() / 8 + 1) * 8;
+  //注意刚好fields_.size()是8的整数倍的情况
+  uint32_t size = (uint32_t)ceil((double)fields_.size() / 8) * 8;
   uint32_t map_num = 0;
   uint32_t map[size];
   while (map_num < size / 8) {
@@ -57,7 +60,8 @@ uint32_t Row::DeserializeFrom(char *buf, Schema *schema) {
   buf += 4;
   ofs += 4;
   // read null bitmap
-  uint32_t size = (field_num / 8 + 1) * 8;
+  //注意刚好fields_.size()是8的整数倍的情况
+  uint32_t size = (uint32_t)ceil((double)field_num / 8) * 8;
   uint32_t map_num = 0;
   uint32_t map[size];
   while (map_num < size / 8) {
@@ -79,7 +83,6 @@ uint32_t Row::DeserializeFrom(char *buf, Schema *schema) {
   }
   // deserialize
   for (uint32_t i = 0; i < field_num; i++) {
-
     TypeId type = schema->GetColumn(i)->GetType();
     uint32_t t;
     Field *f;
@@ -114,7 +117,7 @@ uint32_t Row::GetSerializedSize(Schema *schema) const {
   }
   uint32_t sum = 0;
   // header size
-  sum += 4 + (fields_.size() / 8 + 1);
+  sum += 4 + (uint32_t)ceil((double)fields_.size() / 8);
   // fields
   for (uint32_t i = 0; i < fields_.size(); i++) {
     if (fields_[i]->IsNull() != false) {

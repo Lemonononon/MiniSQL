@@ -56,5 +56,5 @@ class ClockReplacer : public Replacer {
   void SwapNodes(size_t v_1, size_t v_2);
   void HandInc();
   size_t FindUsedBeforeHand();
-  void Test(size_t num);
+//  void Test(size_t num);
 };
