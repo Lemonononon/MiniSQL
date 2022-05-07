@@ -11,7 +11,7 @@ ClockReplacer::ClockReplacer(size_t num_pages) {
 ClockReplacer::~ClockReplacer(){};
 
 bool ClockReplacer::Victim(frame_id_t *frame_id) {
-  cout<<"Victim Called"<<endl;
+//  cout<<"Victim Called"<<endl;
   if (Size()) {
     //寻找一个status为0的有效节点（hand指向一定有效，所以没有判断是否有效的必要）
     while (nodes.at(hand).node_status) {
@@ -24,15 +24,15 @@ bool ClockReplacer::Victim(frame_id_t *frame_id) {
     nodes.at(hand).isNull = true;
     //删掉了hand之后，将temp重新指向下一个
     HandInc();
-    Test(1);
+//    Test(1);
     return true;
   }
-  Test(2);
+//  Test(2);
   return false;
 }
 
 void ClockReplacer::Pin(frame_id_t frame_id) {
-  cout<<"Pin Called"<< " frame_id: " << frame_id <<endl;
+//  cout<<"Pin Called"<< " frame_id: " << frame_id <<endl;
   //如果已经有了hand
   if(Size()&&Find(frame_id)!=(size_t)-1){
     //查看删除的是否是当前hand指向的
@@ -44,11 +44,11 @@ void ClockReplacer::Pin(frame_id_t frame_id) {
     //非当前hand指向，直接设置IsNULL
     nodes.at(Find(frame_id)).isNull = true;
   }
-  Test(3);
+//  Test(3);
 }
 
 void ClockReplacer::Unpin(frame_id_t frame_id) {
-  cout<<"Unpin Called"<< " frame_id: " << frame_id <<endl;
+//  cout<<"Unpin Called"<< " frame_id: " << frame_id <<endl;
   size_t temp; //临时的node,用来插入和删除
   size_t index = Find(frame_id);  //对应的下标
   if (index != (size_t)-1 && !nodes.at(index).isNull) {
@@ -70,7 +70,7 @@ void ClockReplacer::Unpin(frame_id_t frame_id) {
     //如果是插入的第一个元素
     if(Size() == 1) hand = temp;
   }
-  Test(4);
+//  Test(4);
 }
 
 size_t ClockReplacer::Size() {
@@ -128,12 +128,12 @@ size_t ClockReplacer::FindUsedBeforeHand() {
 }
 
 //打印测试信息
-void ClockReplacer::Test(size_t num) {
-  cout << "Test" << num << " hand: " << hand <<endl;
-  for(size_t i = 0; i < num_page; i++){
-    cout << "vector" << i << " page: " << nodes.at(i).frame_id << " isNull: " << nodes.at(i).isNull<< " status: "
-         << nodes.at(i).node_status<<endl;
-  }
-  cout << "vectorSize: " << num_page << endl;
-  cout << endl;
-}
+//void ClockReplacer::Test(size_t num) {
+//  cout << "Test" << num << " hand: " << hand <<endl;
+//  for(size_t i = 0; i < num_page; i++){
+//    cout << "vector" << i << " page: " << nodes.at(i).frame_id << " isNull: " << nodes.at(i).isNull<< " status: "
+//         << nodes.at(i).node_status<<endl;
+//  }
+//  cout << "vectorSize: " << num_page << endl;
+//  cout << endl;
+//}
