@@ -113,6 +113,7 @@ CmpBool TypeInt::CompareEquals(const Field &left, const Field &right) const {
   return GetCmpBool(left.value_.integer_ == right.value_.integer_);
 }
 
+
 CmpBool TypeInt::CompareNotEquals(const Field &left, const Field &right) const {
   ASSERT(left.CheckComparable(right), "Not comparable.");
   if (left.IsNull() || right.IsNull()) {

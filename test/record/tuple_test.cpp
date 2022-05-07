@@ -80,7 +80,6 @@ TEST(TupleTest, FieldSerializeDeserializeTest) {
 }
 
 TEST(TupleTest, RowTest) {
-  printf("good 1\n");
   SimpleMemHeap heap;
   TablePage table_page;
 
