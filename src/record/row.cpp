@@ -76,12 +76,12 @@ uint32_t Row::DeserializeFrom(char *buf, Schema *schema) {
     TypeId type= schema->GetColumn(i)->GetType();
     Field *f = new Field(type);
     fields_.push_back(f);
-    if (map[i] == 0) {
-      uint32_t t = f->DeserializeFrom(buf, type, &fields_[i], true, heap_);
+    if (map[i]) {
+      uint32_t t = f->DeserializeFrom(buf, type, &fields_[i], false, heap_);
       ofs += t;
       buf += t;
     } else {
-      uint32_t t = f->DeserializeFrom(buf, type, &fields_[i], false, heap_);
+      uint32_t t = f->DeserializeFrom(buf, type, &fields_[i], true, heap_);
       ofs += t;
       buf += t;
     }
@@ -98,7 +98,7 @@ uint32_t Row::GetSerializedSize(Schema *schema) const {
   }
   uint32_t sum = 0;
   // header size
-  sum += 4 + (fields_.size() / 8 + 1);
+  sum += 4 + (uint32_t)ceil((double)fields_.size() / 8);
   // fields
   for (uint32_t i = 0; i < fields_.size(); i++) {
     if (fields_[i]->IsNull() != 0) {
