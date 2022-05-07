@@ -40,10 +40,6 @@ uint32_t Column::SerializeTo(char *buf) const {
   // 5.len_ 4      6.table_ind_ 4 7.nullable_ 1 8.unique_ 1
 
   uint32_t ofs = 0;
-  // write magic number
-  MACH_WRITE_UINT32(buf, COLUMN_MAGIC_NUM);
-  buf += 4;
-  ofs += 4;
   // write column name
   MACH_WRITE_UINT32(buf, name_.size());
   buf += 4;
@@ -77,7 +73,7 @@ uint32_t Column::SerializeTo(char *buf) const {
 uint32_t Column::GetSerializedSize() const {
   // replace with your code here
   // 具体见SerializeTo
-  return MACH_STR_SERIALIZED_SIZE(name_) + 22;
+  return MACH_STR_SERIALIZED_SIZE(name_) + 18;
 }
 
 uint32_t Column::DeserializeFrom(char *buf, Column *&column, MemHeap *heap) {
@@ -85,12 +81,7 @@ uint32_t Column::DeserializeFrom(char *buf, Column *&column, MemHeap *heap) {
 
   // test if empty
   ASSERT(column == nullptr, "Pointer to column is not null in column deserialize.");
-  // read magic number
   uint32_t ofs = 0;
-  uint32_t mag = MACH_READ_UINT32(buf);
-  ASSERT(mag == 210928, "Not Column!");
-  buf += 4;
-  ofs += 4;
   /* deserialize field from buf */
   // read name length
   uint32_t len = MACH_READ_UINT32(buf);

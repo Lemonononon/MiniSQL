@@ -3,10 +3,6 @@
 uint32_t Schema::SerializeTo(char *buf) const {
   // replace with your code here
   uint32_t ofs = 0;
-  // write magic number
-  MACH_WRITE_UINT32(buf, SCHEMA_MAGIC_NUM);
-  ofs += 4;
-  buf += 4;
   // write size of columns_
   MACH_WRITE_UINT32(buf, GetColumnCount());
   ofs += 4;
@@ -23,16 +19,15 @@ uint32_t Schema::SerializeTo(char *buf) const {
 uint32_t Schema::GetSerializedSize() const {
   // replace with your code here
   // magic number(4 byte) + column size(4 byte) + pointers in columns_(8 byte one pointer)
-  return 8 + 8 * columns_.size();
+  if (columns_.size() != 0)
+    return 4 + 8 * columns_.size();
+  else
+    return 0;
 }
 
 uint32_t Schema::DeserializeFrom(char *buf, Schema *&schema, MemHeap *heap) {
   // replace with your code here
   uint32_t ofs = 0;
-  // read magic number
-  ASSERT(MACH_READ_UINT32(buf) == 200715, "Not A Schema");
-  ofs += 4;
-  buf += 4;
   // read size of cols
   uint32_t size = MACH_READ_UINT32(buf);
   ofs += 4;

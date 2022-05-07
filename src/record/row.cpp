@@ -19,7 +19,7 @@ uint32_t Row::SerializeTo(char *buf, Schema *schema) const {
     char bitmap = 0;
     for (uint32_t i = 0; i < 8; i++) {
       // 若该field不为空 则将bitmap中对应位置为1
-      if (!fields_[map_num * 8 + i]->IsNull() && (map_num * 8 + i < fields_.size())) {
+      if ( (map_num * 8 + i < fields_.size())&&(fields_[map_num * 8 + i]->IsNull() != false)) {
         bitmap = bitmap | (0x01 << (7 - i));
         map[map_num * 8 + i] = 1;
       } else
@@ -66,14 +66,18 @@ uint32_t Row::DeserializeFrom(char *buf, Schema *schema) {
     }
     map_num++;
   }
+
   // deserialize
   for (uint32_t i = 0; i < field_num; i++) {
+    TypeId type= schema->GetColumn(i)->GetType();
+    Field *f = new Field(type);
+    fields_.push_back(f);
     if (map[i] == 0) {
-      uint32_t t = fields_[i]->DeserializeFrom(buf, schema->GetColumn(i)->GetType(), &fields_[i], true, heap_);
+      uint32_t t = f->DeserializeFrom(buf, type, &fields_[i], true, heap_);
       ofs += t;
       buf += t;
     } else {
-      uint32_t t = fields_[i]->DeserializeFrom(buf, schema->GetColumn(i)->GetType(), &fields_[i], false, heap_);
+      uint32_t t = f->DeserializeFrom(buf, type, &fields_[i], false, heap_);
       ofs += t;
       buf += t;
     }

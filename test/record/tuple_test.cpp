@@ -80,8 +80,10 @@ TEST(TupleTest, FieldSerializeDeserializeTest) {
 }
 
 TEST(TupleTest, RowTest) {
+  printf("good 1\n");
   SimpleMemHeap heap;
   TablePage table_page;
+
   // create schema
   std::vector<Column *> columns = {ALLOC_COLUMN(heap)("id", TypeId::kTypeInt, 0, false, false),
                                    ALLOC_COLUMN(heap)("name", TypeId::kTypeChar, 64, 1, true, false),
