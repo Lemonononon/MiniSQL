@@ -40,7 +40,6 @@ void ClockReplacer::Pin(frame_id_t frame_id) {
       nodes.at(hand).isNull = true;
       //如果还有其他非空的话就更改hand
       if(Size()) HandInc();
-
     }
     //非当前hand指向，直接设置IsNULL
     nodes.at(Find(frame_id)).isNull = true;

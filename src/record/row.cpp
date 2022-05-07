@@ -1,4 +1,6 @@
 #include "record/row.h"
+#include <iostream>
+using namespace std;
 
 uint32_t Row::SerializeTo(char *buf, Schema *schema) const {
   // replace with your code here
@@ -12,14 +14,15 @@ uint32_t Row::SerializeTo(char *buf, Schema *schema) const {
   ofs += 4;
   buf += 4;
   // write null bitmap
-  uint32_t size = (fields_.size() / 8 + 1) * 8;
+  //注意刚好fields_.size()是8的整数倍的情况
+  uint32_t size = (uint32_t)ceil((double)fields_.size() / 8) * 8;
   uint32_t map_num = 0;
   uint32_t map[size];
   while (map_num < size / 8) {
     char bitmap = 0;
     for (uint32_t i = 0; i < 8; i++) {
       // 若该field不为空 则将bitmap中对应位置为1
-      if ( (map_num * 8 + i < fields_.size())&&(fields_[map_num * 8 + i]->IsNull() != false)) {
+      if ( (map_num * 8 + i < fields_.size()) && fields_[map_num * 8 + i]->IsNull()) {
         bitmap = bitmap | (0x01 << (7 - i));
         map[map_num * 8 + i] = 1;
       } else
@@ -51,7 +54,8 @@ uint32_t Row::DeserializeFrom(char *buf, Schema *schema) {
   buf += 4;
   ofs += 4;
   // read null bitmap
-  uint32_t size = (field_num / 8 + 1) * 8;
+  //注意刚好fields_.size()是8的整数倍的情况
+  uint32_t size = (uint32_t)ceil((double)field_num / 8) * 8;
   uint32_t map_num = 0;
   uint32_t map[size];
   while (map_num < size / 8) {
