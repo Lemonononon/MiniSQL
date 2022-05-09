@@ -61,6 +61,8 @@ private:
   void CopyLastFrom(const MappingType &pair, BufferPoolManager *buffer_pool_manager);
 
   void CopyFirstFrom(const MappingType &pair, BufferPoolManager *buffer_pool_manager);
+  
+  void CopyAllFrom(MappingType *items, int size, BufferPoolManager *buffer_pool_manager);
 
   MappingType array_[0];
 };

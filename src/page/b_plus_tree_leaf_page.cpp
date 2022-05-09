@@ -3,40 +3,48 @@
 #include "index/generic_key.h"
 #include "page/b_plus_tree_leaf_page.h"
 
-/*****************************************************************************
- * HELPER METHODS AND UTILITIES
- *****************************************************************************/
+//****************************HELPER METHODS AND UTILITIES***************************
 
-/**
+/*
  * Init method after creating a new leaf page
  * Including set page type, set current size to zero, set page id/parent id, set
  * next page id and set max size
  */
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_LEAF_PAGE_TYPE::Init(page_id_t page_id, page_id_t parent_id, int max_size) {
-
+  SetPageId(page_id);
+  SetParentPageId(parent_id);
+  SetMaxSize(max_size);
+  SetSize(0);
+  SetPageType(IndexPageType::LEAF_PAGE);
 }
 
-/**
+/*
  * Helper methods to set/get next page id
  */
 INDEX_TEMPLATE_ARGUMENTS
 page_id_t B_PLUS_TREE_LEAF_PAGE_TYPE::GetNextPageId() const {
-  return INVALID_PAGE_ID;
+  return next_page_id_;
 }
 
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_LEAF_PAGE_TYPE::SetNextPageId(page_id_t next_page_id) {
-
+  this->next_page_id_ = next_page_id;
 }
 
-/**
+/*
  * Helper method to find the first index i so that array_[i].first >= key
  * NOTE: This method is only used when generating index iterator
+ * 如果没找到，这里返回GetSize()
  */
 INDEX_TEMPLATE_ARGUMENTS
 int B_PLUS_TREE_LEAF_PAGE_TYPE::KeyIndex(const KeyType &key, const KeyComparator &comparator) const {
-  return 0;
+  for (int i = 0; i < GetSize(); ++i) {
+    if (comparator(array_[i].first, key) == 0) {
+      return i;
+    }
+  }
+  return GetSize();
 }
 
 /*
@@ -46,7 +54,7 @@ int B_PLUS_TREE_LEAF_PAGE_TYPE::KeyIndex(const KeyType &key, const KeyComparator
 INDEX_TEMPLATE_ARGUMENTS
 KeyType B_PLUS_TREE_LEAF_PAGE_TYPE::KeyAt(int index) const {
   // replace with your own code
-  KeyType key{};
+  KeyType key{array_[index].first};
   return key;
 }
 
@@ -57,30 +65,46 @@ KeyType B_PLUS_TREE_LEAF_PAGE_TYPE::KeyAt(int index) const {
 INDEX_TEMPLATE_ARGUMENTS
 const MappingType &B_PLUS_TREE_LEAF_PAGE_TYPE::GetItem(int index) {
   // replace with your own code
-  return array_[0];
+  return array_[index];
 }
 
-/*****************************************************************************
- * INSERTION
- *****************************************************************************/
+// *******************************INSERTION*************************************
+
 /*
  * Insert key & value pair into leaf page ordered by key
  * @return page size after insertion
  */
 INDEX_TEMPLATE_ARGUMENTS
 int B_PLUS_TREE_LEAF_PAGE_TYPE::Insert(const KeyType &key, const ValueType &value, const KeyComparator &comparator) {
-  return 0;
+  int hasInserted = 0;
+  // TODO: 后续修改为二分查找
+  for (int i = 0; i < GetSize(); ++i) {
+    if (comparator(array_[i].first, key) > 0) {
+      for (int j = GetSize(); j > i; --j) {
+        array_[j] = array_[j-1];
+      }
+      array_[i] = {key, value};
+      hasInserted = 1;
+      break;
+    }
+  }
+  if (!hasInserted) {
+    array_[GetSize()] = {key, value};
+  }
+  IncreaseSize(1);
+  return GetSize();
 }
 
-/*****************************************************************************
- * SPLIT
- *****************************************************************************/
+// *************************************SPLIT****************************************
+
 /*
  * Remove half of key & value pairs from this page to "recipient" page
  */
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveHalfTo(BPlusTreeLeafPage *recipient) {
-
+  int halfSize = (GetSize()) + 1 / 2;
+  recipient->CopyNFrom(array_ + GetSize() - halfSize, halfSize);
+  IncreaseSize(-halfSize);
 }
 
 /*
@@ -88,12 +112,14 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveHalfTo(BPlusTreeLeafPage *recipient) {
  */
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_LEAF_PAGE_TYPE::CopyNFrom(MappingType *items, int size) {
-
+  for (int i = 0; i < size; ++i) {
+    array_[i] = items[i];
+  }
+  IncreaseSize(size);
 }
 
-/*****************************************************************************
- * LOOKUP
- *****************************************************************************/
+//********************************LOOKUP**********************************
+
 /*
  * For the given key, check to see whether it exists in the leaf page. If it
  * does, then store its corresponding value in input "value" and return true.
@@ -101,12 +127,19 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::CopyNFrom(MappingType *items, int size) {
  */
 INDEX_TEMPLATE_ARGUMENTS
 bool B_PLUS_TREE_LEAF_PAGE_TYPE::Lookup(const KeyType &key, ValueType &value, const KeyComparator &comparator) const {
+  // TODO: 跑通后来优化为二分查找
+  for (int i = 1; i < GetSize(); ++i) {
+    // array_[i].first == key
+    if (comparator(array_[i].first, key) == 0) {
+      value = array_[i].second;
+      return true;
+    }
+  }
   return false;
 }
 
-/*****************************************************************************
- * REMOVE
- *****************************************************************************/
+// **********************************REMOVE*********************************
+
 /*
  * First look through leaf page to see whether delete key exist or not. If
  * exist, perform deletion, otherwise return immediately.
@@ -115,19 +148,37 @@ bool B_PLUS_TREE_LEAF_PAGE_TYPE::Lookup(const KeyType &key, ValueType &value, co
  */
 INDEX_TEMPLATE_ARGUMENTS
 int B_PLUS_TREE_LEAF_PAGE_TYPE::RemoveAndDeleteRecord(const KeyType &key, const KeyComparator &comparator) {
-  return 0;
+  for (int i = 0; i < GetSize(); ++i) {
+    if (comparator(array_[i].first, key) == 0) {
+      for (int j = i; j < GetSize() - 1; ++j) {
+        array_[i] = array_[i+1];
+      }
+      IncreaseSize(-1);
+      break;
+    }
+  }
+  return GetSize();
 }
 
-/*****************************************************************************
- * MERGE
- *****************************************************************************/
+//******************************MERGE********************************
+
 /*
  * Remove all of key & value pairs from this page to "recipient" page. Don't forget
  * to update the next_page id in the sibling page
  */
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveAllTo(BPlusTreeLeafPage *recipient) {
+  recipient->CopyAllFrom(array_, GetSize());
+  recipient->SetNextPageId(GetNextPageId());
+}
 
+INDEX_TEMPLATE_ARGUMENTS
+void B_PLUS_TREE_LEAF_PAGE_TYPE::CopyAllFrom(MappingType *items, int size) {
+  int ori_size = GetSize();
+  for (int i = 0; i < size; ++i) {
+    array_[ori_size + i] = items[i];
+  }
+  IncreaseSize(size);
 }
 
 /*****************************************************************************

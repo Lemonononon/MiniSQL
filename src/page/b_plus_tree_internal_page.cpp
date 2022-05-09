@@ -144,7 +144,7 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::CopyNFrom(MappingType *items, int size, Buf
     node->SetParentPageId(GetPageId());
     buffer_pool_manager->UnpinPage(node->GetPageId(), true);
   }
-  // 初始化时大小为1，只增加size-1
+  // 初始化时大小为1，只增加size-1，因为这上下两个方法是出于分裂而使用的，比如兄弟拆了两个key&value pair来新节点，显然新节点只有一个有效key
   IncreaseSize(size - 1);
 }
 
@@ -189,7 +189,7 @@ INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveAllTo(BPlusTreeInternalPage *recipient, const KeyType &middle_key,
                                                BufferPoolManager *buffer_pool_manager) {
   SetKeyAt(0, middle_key);
-  recipient->CopyNFrom(array_, GetSize(), buffer_pool_manager);
+  recipient->CopyAllFrom(array_, GetSize(), buffer_pool_manager);
   // 更新disk中的pages的parent
   for (int i = 0; i < GetSize(); ++i) {
     auto page = buffer_pool_manager->FetchPage(ValueAt(i));
@@ -197,6 +197,16 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveAllTo(BPlusTreeInternalPage *recipient,
     node->SetParentPageId(recipient->GetParentPageId());
     buffer_pool_manager->UnpinPage(ValueAt(i), true);
   }
+}
+
+INDEX_TEMPLATE_ARGUMENTS
+void B_PLUS_TREE_INTERNAL_PAGE_TYPE::CopyAllFrom(MappingType *items, int size,
+            BufferPoolManager *buffer_pool_manager) {
+  int ori_size = GetSize();
+  for (int i = 0; i < size; ++i) {
+    array_[ori_size + i] = items[i];
+  }
+  IncreaseSize(size);
 }
 
 //********************************REDISTRIBUTE*************************************

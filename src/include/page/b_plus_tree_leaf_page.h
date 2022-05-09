@@ -71,6 +71,8 @@ private:
 
   void CopyFirstFrom(const MappingType &item);
 
+  void CopyAllFrom(MappingType *items, int size);
+
   page_id_t next_page_id_;
   MappingType array_[0];
 };
