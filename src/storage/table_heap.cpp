@@ -60,7 +60,7 @@ bool TableHeap::MarkDelete(const RowId &rid, Transaction *txn) {
 bool TableHeap::UpdateTuple(const Row &row, const RowId &rid, Transaction *txn) {
   // rid is old row, get its page and update
   auto page = reinterpret_cast<TablePage *>(buffer_pool_manager_->FetchPage(rid.GetPageId()));
-  if(page== nullptr) return false;
+  if (page == nullptr) return false;
   Row old(rid);
   // get old row by get_tuple
   if (!GetTuple(&old, txn)) {
@@ -106,7 +106,26 @@ void TableHeap::RollbackDelete(const RowId &rid, Transaction *txn) {
   buffer_pool_manager_->UnpinPage(page->GetTablePageId(), true);
 }
 
-void TableHeap::FreeHeap() {}
+void TableHeap::FreeHeap() {
+  page_id_t now_page_id = first_page_id_;
+  auto page = reinterpret_cast<TablePage *>(buffer_pool_manager_->FetchPage(now_page_id));
+  page->RLatch();
+  page_id_t new_page_id = page->GetNextPageId();
+  page->RUnlatch();
+  while (now_page_id != INVALID_PAGE_ID) {
+    buffer_pool_manager_->DeletePage(now_page_id);
+    now_page_id = new_page_id;
+    page = reinterpret_cast<TablePage *>(buffer_pool_manager_->FetchPage(now_page_id));
+    page->RLatch();
+    new_page_id = page->GetNextPageId();
+    page->RUnlatch();
+  }
+  delete buffer_pool_manager_;
+  delete &first_page_id_;
+  delete schema_;
+  delete log_manager_;
+  delete lock_manager_;
+}
 
 bool TableHeap::GetTuple(Row *row, Transaction *txn) {
   auto page = reinterpret_cast<TablePage *>(buffer_pool_manager_->FetchPage(row->GetRowId().GetPageId()));
@@ -129,11 +148,11 @@ TableIterator TableHeap::Begin(Transaction *txn) {
   page->GetFirstTupleRid(&rid);
   page->RUnlatch();
   buffer_pool_manager_->UnpinPage(first_page_id_, false);
-  return TableIterator(this,rid);
+  return TableIterator(this, rid);
 }
 
 TableIterator TableHeap::End() {
   // 默认page_id = INVALID_PAGE_ID slot_num为0
   RowId rid;
-  return  TableIterator(this,rid);
+  return TableIterator(this, rid);
 }
