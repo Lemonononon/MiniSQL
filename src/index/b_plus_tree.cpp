@@ -81,11 +81,16 @@ bool BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value, Transact
 INDEX_TEMPLATE_ARGUMENTS
 void BPLUSTREE_TYPE::StartNewTree(const KeyType &key, const ValueType &value) {
   page_id_t page_id;
-  auto page = buffer_pool_manager_->NewPage(page_id);
+  auto page = buffer_pool_manager_->NewPage(root_page_id_);
   if (page == nullptr) {
     throw Exception("out of memory");
   }
-  root_page_id_ = page_id;
+  // true表示是插入而不是更新
+  UpdateRootPageId(true);
+  auto root = reinterpret_cast<B_PLUS_TREE_LEAF_PAGE_TYPE*>(page->GetData());
+  root->Init(root_page_id_, INVALID_PAGE_ID);
+  root->Insert(key, value, comparator_);
+  buffer_pool_manager_->UnpinPage(root->GetPageId(), true);
 }
 
 /*
@@ -98,7 +103,27 @@ void BPLUSTREE_TYPE::StartNewTree(const KeyType &key, const ValueType &value) {
  */
 INDEX_TEMPLATE_ARGUMENTS
 bool BPLUSTREE_TYPE::InsertIntoLeaf(const KeyType &key, const ValueType &value, Transaction *transaction) {
-  return false;
+  auto leaf = reinterpret_cast<B_PLUS_TREE_LEAF_PAGE_TYPE*>(FindLeafPage(key)->GetData());
+  if (leaf == nullptr) {
+    throw Exception("insert failed");
+  }
+  ValueType tmp = value;
+  if (leaf->Lookup(key, tmp, comparator_)) {
+    return false;
+  }
+  if (leaf->GetSize() < leaf->GetMaxSize()) {
+    leaf->Insert(key, value, comparator_);
+  } else {
+    auto sibling = Split<B_PLUS_TREE_LEAF_PAGE_TYPE>(leaf);
+    if (comparator_(key, sibling->KeyAt(0)) < 0) {
+      leaf->Insert(key, value, comparator_);
+    } else {
+      sibling->Insert(key, value, comparator_);
+    }
+    leaf->SetNextPageId(sibling->GetPageId());
+    InsertIntoParent(leaf, sibling->KeyAt(0), sibling, transaction);
+  }
+  return true;
 }
 
 /*
@@ -111,7 +136,15 @@ bool BPLUSTREE_TYPE::InsertIntoLeaf(const KeyType &key, const ValueType &value, 
 INDEX_TEMPLATE_ARGUMENTS
 template<typename N>
 N *BPLUSTREE_TYPE::Split(N *node) {
-  return nullptr;
+  page_id_t page_id;
+  auto page = buffer_pool_manager_->NewPage(page_id);
+  if (page == nullptr) {
+    throw Exception("out of memory");
+  }
+  auto sibling = reinterpret_cast<N*>(page->GetData());
+  sibling->Init(page_id);
+  node->MoveHalfTo(sibling);
+  return sibling;
 }
 
 /*
@@ -126,6 +159,8 @@ N *BPLUSTREE_TYPE::Split(N *node) {
 INDEX_TEMPLATE_ARGUMENTS
 void BPLUSTREE_TYPE::InsertIntoParent(BPlusTreePage *old_node, const KeyType &key, BPlusTreePage *new_node,
                                       Transaction *transaction) {
+  page_id_t parent_page_id = old_node->GetParentPageId();
+
 }
 
 /*****************************************************************************
