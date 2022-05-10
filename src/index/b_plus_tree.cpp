@@ -4,6 +4,7 @@
 #include "index/basic_comparator.h"
 #include "index/generic_key.h"
 #include "page/index_roots_page.h"
+#include "utils/exception.h"
 
 INDEX_TEMPLATE_ARGUMENTS
 BPLUSTREE_TYPE::BPlusTree(index_id_t index_id, BufferPoolManager *buffer_pool_manager, const KeyComparator &comparator,
@@ -79,6 +80,12 @@ bool BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value, Transact
  */
 INDEX_TEMPLATE_ARGUMENTS
 void BPLUSTREE_TYPE::StartNewTree(const KeyType &key, const ValueType &value) {
+  page_id_t page_id;
+  auto page = buffer_pool_manager_->NewPage(page_id);
+  if (page == nullptr) {
+    throw Exception("out of memory");
+  }
+  root_page_id_ = page_id;
 }
 
 /*
