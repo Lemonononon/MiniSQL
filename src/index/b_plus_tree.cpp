@@ -13,7 +13,8 @@ BPLUSTREE_TYPE::BPlusTree(index_id_t index_id, BufferPoolManager *buffer_pool_ma
           comparator_(comparator),
           leaf_max_size_(leaf_max_size),
           internal_max_size_(internal_max_size) {
-
+  // 初始化为空
+  root_page_id_ = INVALID_PAGE_ID;
 }
 
 INDEX_TEMPLATE_ARGUMENTS
@@ -25,12 +26,11 @@ void BPLUSTREE_TYPE::Destroy() {
  */
 INDEX_TEMPLATE_ARGUMENTS
 bool BPLUSTREE_TYPE::IsEmpty() const {
-  return false;
+  return root_page_id_ == INVALID_PAGE_ID;
 }
 
-/*****************************************************************************
- * SEARCH
- *****************************************************************************/
+// ****************************************SEARCH***********************************************
+
 /*
  * Return the only value that associated with input key
  * This method is used for point query
@@ -38,12 +38,20 @@ bool BPLUSTREE_TYPE::IsEmpty() const {
  */
 INDEX_TEMPLATE_ARGUMENTS
 bool BPLUSTREE_TYPE::GetValue(const KeyType &key, std::vector<ValueType> &result, Transaction *transaction) {
-  return false;
+  auto leaf = reinterpret_cast<B_PLUS_TREE_LEAF_PAGE_TYPE*>(FindLeafPage(key)->GetData());
+  bool res = false;
+  if (leaf != nullptr) {
+    ValueType value;
+    if (leaf->Lookup(key, value, comparator_)) {
+      result.push_back(value);
+      res = true;
+    }
+  }
+  return res;
 }
 
-/*****************************************************************************
- * INSERTION
- *****************************************************************************/
+// ***************************************INSERTION********************************************
+
 /*
  * Insert constant key & value pair into b+ tree
  * if current tree is empty, start new tree, update root page id and insert
@@ -53,7 +61,15 @@ bool BPLUSTREE_TYPE::GetValue(const KeyType &key, std::vector<ValueType> &result
  */
 INDEX_TEMPLATE_ARGUMENTS
 bool BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value, Transaction *transaction) {
-  return false;
+  bool res = false;
+  if (IsEmpty()) {
+    StartNewTree(key, value);
+    res = true;
+  }
+  else {
+    res = InsertIntoLeaf(key, value, transaction);
+  }
+  return res;
 }
 /*
  * Insert constant key & value pair into an empty tree
@@ -220,10 +236,26 @@ INDEXITERATOR_TYPE BPLUSTREE_TYPE::End() {
  * Find leaf page containing particular key, if leftMost flag == true, find
  * the left most leaf page
  * Note: the leaf page is pinned, you need to unpin it after use.
+ * 意思是如果leftMost，那么只返回最最左边的那一片叶子page，否则就是正常的全局搜索
+ * 注意，这里并不需要查找key是否确切存在，只需要返回可能的那片叶子
  */
 INDEX_TEMPLATE_ARGUMENTS
 Page *BPLUSTREE_TYPE::FindLeafPage(const KeyType &key, bool leftMost) {
-  return nullptr;
+  auto node = buffer_pool_manager_->FetchPage(root_page_id_);
+  while (!reinterpret_cast<BPlusTreePage*>(node->GetData())->IsLeafPage()) {
+    auto internal_node = reinterpret_cast<BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>*>(node->GetData());
+    page_id_t child_page_id;
+    if (leftMost) {
+      child_page_id = internal_node->ValueAt(0);
+    }
+    else {
+      child_page_id = internal_node->Lookup(key, comparator_);
+    }
+    buffer_pool_manager_->UnpinPage(internal_node->GetPageId(), false);
+    node = buffer_pool_manager_->FetchPage(child_page_id);
+  }
+  // 退出循环后，这里已经是叶子节点
+  return node;
 }
 
 /*
