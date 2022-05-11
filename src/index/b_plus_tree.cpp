@@ -80,7 +80,6 @@ bool BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value, Transact
  */
 INDEX_TEMPLATE_ARGUMENTS
 void BPLUSTREE_TYPE::StartNewTree(const KeyType &key, const ValueType &value) {
-  page_id_t page_id;
   auto page = buffer_pool_manager_->NewPage(root_page_id_);
   if (page == nullptr) {
     throw Exception("out of memory");
@@ -159,7 +158,7 @@ N *BPLUSTREE_TYPE::Split(N *node) {
 INDEX_TEMPLATE_ARGUMENTS
 void BPLUSTREE_TYPE::InsertIntoParent(BPlusTreePage *old_node, const KeyType &key, BPlusTreePage *new_node,
                                       Transaction *transaction) {
-  page_id_t parent_page_id = old_node->GetParentPageId();
+//  page_id_t parent_page_id = old_node->GetParentPageId();
 
 }
 
