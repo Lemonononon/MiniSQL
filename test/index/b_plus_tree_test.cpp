@@ -34,6 +34,7 @@ TEST(BPlusTreeTests, SampleTest) {
   }
   // Insert data
   for (int i = 0; i < n; i++) {
+    cout << "insert key:" << keys[i] << " value: " << values[i] << endl;
     tree.Insert(keys[i], values[i]);
   }
   ASSERT_TRUE(tree.Check());
@@ -46,6 +47,7 @@ TEST(BPlusTreeTests, SampleTest) {
     ASSERT_EQ(kv_map[i], ans[i]);
   }
   ASSERT_TRUE(tree.Check());
+  cout << "start delete" << endl;
   // Delete half keys
   for (int i = 0; i < n / 2; i++) {
     tree.Remove(delete_seq[i]);

@@ -101,8 +101,8 @@ int B_PLUS_TREE_LEAF_PAGE_TYPE::Insert(const KeyType &key, const ValueType &valu
  * Remove half of key & value pairs from this page to "recipient" page
  */
 INDEX_TEMPLATE_ARGUMENTS
-void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveHalfTo(BPlusTreeLeafPage *recipient) {
-  int halfSize = (GetSize()) + 1 / 2;
+void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveHalfTo(BPlusTreeLeafPage *recipient, BufferPoolManager *buffer_pool_manager) {
+  int halfSize = (GetSize() + 1) / 2;
   recipient->CopyNFrom(array_ + GetSize() - halfSize, halfSize);
   IncreaseSize(-halfSize);
 }
@@ -128,7 +128,7 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::CopyNFrom(MappingType *items, int size) {
 INDEX_TEMPLATE_ARGUMENTS
 bool B_PLUS_TREE_LEAF_PAGE_TYPE::Lookup(const KeyType &key, ValueType &value, const KeyComparator &comparator) const {
   // TODO: 跑通后来优化为二分查找
-  for (int i = 1; i < GetSize(); ++i) {
+  for (int i = 0; i < GetSize(); ++i) {
     // array_[i].first == key
     if (comparator(array_[i].first, key) == 0) {
       value = array_[i].second;

@@ -39,6 +39,8 @@ Page *BufferPoolManager::FetchPage(page_id_t page_id) {
   // 4.     Update P's metadata, read in the page content from disk, and then return a pointer to P.
   if (page_table_.find(page_id) != page_table_.end()) {
     replacer_->Pin(page_table_[page_id]);
+    pages_[page_table_[page_id]].pin_count_++;
+//    cout << "+";
     return pages_ + page_table_[page_id];
   } else {
     frame_id_t free_page_index;
@@ -71,6 +73,7 @@ Page *BufferPoolManager::FetchPage(page_id_t page_id) {
     disk_manager_->ReadPage(page_id, pages_[free_page_index].data_);
     replacer_->Pin(free_page_index);
     pages_[free_page_index].pin_count_++;
+//    cout << "+";
     return pages_ + free_page_index;
   }
 }
@@ -107,7 +110,8 @@ Page *BufferPoolManager::NewPage(page_id_t &page_id) {
   pages_[free_page_index].page_id_ = page_id;
   page_table_[page_id] = free_page_index;
   replacer_->Pin(free_page_index);
-  pages_[free_page_index].pin_count_++;
+  pages_[free_page_index].pin_count_ = 1;
+//  cout << "+";
   return pages_ + free_page_index;
 }
 
@@ -134,6 +138,7 @@ bool BufferPoolManager::DeletePage(page_id_t page_id) {
 bool BufferPoolManager::UnpinPage(page_id_t page_id, bool is_dirty) {
   if (page_table_.find(page_id) == page_table_.end()) return false;
   pages_[page_table_[page_id]].pin_count_--;
+//  cout << "-";
   pages_[page_table_[page_id]].is_dirty_ = pages_[page_table_[page_id]].is_dirty_ || is_dirty;
   replacer_->Unpin(page_table_[page_id]);
   return true;

@@ -107,9 +107,9 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::PopulateNewRoot(const ValueType &old_value,
 INDEX_TEMPLATE_ARGUMENTS
 int B_PLUS_TREE_INTERNAL_PAGE_TYPE::InsertNodeAfter(const ValueType &old_value, const KeyType &new_key,
                                                     const ValueType &new_value) {
-  int insertIndex = ValueIndex(old_value);
+  int insertIndex = ValueIndex(old_value) + 1;
   int oriSize = GetSize();
-  for (int i = insertIndex + 1; i < oriSize + 1; ++i) {
+  for (int i = oriSize; i > insertIndex; --i) {
     array_[i] = array_[i - 1];
   }
   IncreaseSize(1);
@@ -125,7 +125,7 @@ int B_PLUS_TREE_INTERNAL_PAGE_TYPE::InsertNodeAfter(const ValueType &old_value, 
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveHalfTo(BPlusTreeInternalPage *recipient,
                                                 BufferPoolManager *buffer_pool_manager) {
-  int halfSize = (GetSize()) + 1 / 2;
+  int halfSize = (GetSize() + 1) / 2;
   recipient->CopyNFrom(array_ + GetSize() - halfSize, halfSize, buffer_pool_manager);
   IncreaseSize(-halfSize);
 }
