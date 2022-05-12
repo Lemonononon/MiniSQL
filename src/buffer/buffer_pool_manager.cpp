@@ -140,7 +140,9 @@ bool BufferPoolManager::UnpinPage(page_id_t page_id, bool is_dirty) {
   pages_[page_table_[page_id]].pin_count_--;
 //  cout << "-";
   pages_[page_table_[page_id]].is_dirty_ = pages_[page_table_[page_id]].is_dirty_ || is_dirty;
-  replacer_->Unpin(page_table_[page_id]);
+  if (pages_[page_table_[page_id]].pin_count_ == 0) {
+    replacer_->Unpin(page_table_[page_id]);
+  }
   return true;
 }
 
