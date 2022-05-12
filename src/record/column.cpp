@@ -28,15 +28,21 @@ Column::Column(const Column *other) : name_(other->name_), type_(other->type_), 
 
 uint32_t Column::SerializeTo(char *buf) const {
   // replace with your code here
+
+
   return 0;
 }
 
 uint32_t Column::GetSerializedSize() const {
   // replace with your code here
+
+
   return 0;
 }
 
 uint32_t Column::DeserializeFrom(char *buf, Column *&column, MemHeap *heap) {
   // replace with your code here
+
+
   return 0;
 }
