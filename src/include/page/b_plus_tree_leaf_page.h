@@ -58,7 +58,7 @@ public:
   // Split and Merge utility methods
   void MoveHalfTo(BPlusTreeLeafPage *recipient, BufferPoolManager *buffer_pool_manager);
 
-  void MoveAllTo(BPlusTreeLeafPage *recipient);
+  void MoveAllTo(BPlusTreeLeafPage *recipient, const KeyType &, BufferPoolManager *);
 
   void MoveFirstToEndOf(BPlusTreeLeafPage *recipient);
 

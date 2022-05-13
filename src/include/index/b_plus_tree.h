@@ -85,7 +85,7 @@ private:
   bool CoalesceOrRedistribute(N *node, Transaction *transaction = nullptr);
 
   template<typename N>
-  bool Coalesce(N **neighbor_node, N **node, BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator> **parent,
+  bool Coalesce(N *neighbor_node, N *node, BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator> *parent,
                 int index, Transaction *transaction = nullptr);
 
   template<typename N>
