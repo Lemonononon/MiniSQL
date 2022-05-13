@@ -1,7 +1,7 @@
+#include "page/b_plus_tree_leaf_page.h"
 #include <algorithm>
 #include "index/basic_comparator.h"
 #include "index/generic_key.h"
-#include "page/b_plus_tree_leaf_page.h"
 
 //****************************HELPER METHODS AND UTILITIES***************************
 
@@ -23,14 +23,10 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::Init(page_id_t page_id, page_id_t parent_id, in
  * Helper methods to set/get next page id
  */
 INDEX_TEMPLATE_ARGUMENTS
-page_id_t B_PLUS_TREE_LEAF_PAGE_TYPE::GetNextPageId() const {
-  return next_page_id_;
-}
+page_id_t B_PLUS_TREE_LEAF_PAGE_TYPE::GetNextPageId() const { return next_page_id_; }
 
 INDEX_TEMPLATE_ARGUMENTS
-void B_PLUS_TREE_LEAF_PAGE_TYPE::SetNextPageId(page_id_t next_page_id) {
-  this->next_page_id_ = next_page_id;
-}
+void B_PLUS_TREE_LEAF_PAGE_TYPE::SetNextPageId(page_id_t next_page_id) { this->next_page_id_ = next_page_id; }
 
 /*
  * Helper method to find the first index i so that array_[i].first >= key
@@ -81,7 +77,7 @@ int B_PLUS_TREE_LEAF_PAGE_TYPE::Insert(const KeyType &key, const ValueType &valu
   for (int i = 0; i < GetSize(); ++i) {
     if (comparator(array_[i].first, key) > 0) {
       for (int j = GetSize(); j > i; --j) {
-        array_[j] = array_[j-1];
+        array_[j] = array_[j - 1];
       }
       array_[i] = {key, value};
       hasInserted = 1;
@@ -151,7 +147,7 @@ int B_PLUS_TREE_LEAF_PAGE_TYPE::RemoveAndDeleteRecord(const KeyType &key, const 
   for (int i = 0; i < GetSize(); ++i) {
     if (comparator(array_[i].first, key) == 0) {
       for (int j = i; j < GetSize() - 1; ++j) {
-        array_[i] = array_[i+1];
+        array_[j] = array_[j + 1];
       }
       IncreaseSize(-1);
       break;
@@ -189,8 +185,12 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::CopyAllFrom(MappingType *items, int size) {
  *
  */
 INDEX_TEMPLATE_ARGUMENTS
-void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveFirstToEndOf(BPlusTreeLeafPage *recipient) {
-
+void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveFirstToEndOf(BPlusTreeLeafPage *recipient, const KeyType &, BufferPoolManager *) {
+  recipient->CopyLastFrom(array_[0]);
+  for (int i = 0; i < GetSize() - 1; ++i) {
+    array_[i] = array_[i + 1];
+  }
+  IncreaseSize(-1);
 }
 
 /*
@@ -198,15 +198,17 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveFirstToEndOf(BPlusTreeLeafPage *recipient) 
  */
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_LEAF_PAGE_TYPE::CopyLastFrom(const MappingType &item) {
-
+  array_[GetSize()] = item;
+  IncreaseSize(1);
 }
 
 /*
  * Remove the last key & value pair from this page to "recipient" page.
  */
 INDEX_TEMPLATE_ARGUMENTS
-void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveLastToFrontOf(BPlusTreeLeafPage *recipient) {
-
+void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveLastToFrontOf(BPlusTreeLeafPage *recipient, const KeyType &, BufferPoolManager *) {
+  recipient->CopyFirstFrom(array_[GetSize() - 1]);
+  IncreaseSize(-1);
 }
 
 /*
@@ -215,23 +217,21 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::MoveLastToFrontOf(BPlusTreeLeafPage *recipient)
  */
 INDEX_TEMPLATE_ARGUMENTS
 void B_PLUS_TREE_LEAF_PAGE_TYPE::CopyFirstFrom(const MappingType &item) {
-
+  for (int i = GetSize(); i > 0; --i) {
+    array_[i] = array_[i - 1];
+  }
+  array_[0] = item;
+  IncreaseSize(1);
 }
 
-template
-class BPlusTreeLeafPage<int, int, BasicComparator<int>>;
+template class BPlusTreeLeafPage<int, int, BasicComparator<int>>;
 
-template
-class BPlusTreeLeafPage<GenericKey<4>, RowId, GenericComparator<4>>;
+template class BPlusTreeLeafPage<GenericKey<4>, RowId, GenericComparator<4>>;
 
-template
-class BPlusTreeLeafPage<GenericKey<8>, RowId, GenericComparator<8>>;
+template class BPlusTreeLeafPage<GenericKey<8>, RowId, GenericComparator<8>>;
 
-template
-class BPlusTreeLeafPage<GenericKey<16>, RowId, GenericComparator<16>>;
+template class BPlusTreeLeafPage<GenericKey<16>, RowId, GenericComparator<16>>;
 
-template
-class BPlusTreeLeafPage<GenericKey<32>, RowId, GenericComparator<32>>;
+template class BPlusTreeLeafPage<GenericKey<32>, RowId, GenericComparator<32>>;
 
-template
-class BPlusTreeLeafPage<GenericKey<64>, RowId, GenericComparator<64>>;
+template class BPlusTreeLeafPage<GenericKey<64>, RowId, GenericComparator<64>>;

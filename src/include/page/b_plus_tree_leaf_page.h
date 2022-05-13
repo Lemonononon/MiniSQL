@@ -60,9 +60,9 @@ public:
 
   void MoveAllTo(BPlusTreeLeafPage *recipient, const KeyType &, BufferPoolManager *);
 
-  void MoveFirstToEndOf(BPlusTreeLeafPage *recipient);
+  void MoveFirstToEndOf(BPlusTreeLeafPage *recipient, const KeyType &, BufferPoolManager *);
 
-  void MoveLastToFrontOf(BPlusTreeLeafPage *recipient);
+  void MoveLastToFrontOf(BPlusTreeLeafPage *recipient, const KeyType &, BufferPoolManager *);
 
 private:
   void CopyNFrom(MappingType *items, int size);

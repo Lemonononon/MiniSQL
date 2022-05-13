@@ -1,6 +1,6 @@
+#include "index/b_plus_tree.h"
 #include "common/instance.h"
 #include "gtest/gtest.h"
-#include "index/b_plus_tree.h"
 #include "index/basic_comparator.h"
 #include "utils/tree_file_mgr.h"
 #include "utils/utils.h"
@@ -34,7 +34,7 @@ TEST(BPlusTreeTests, SampleTest) {
   }
   // Insert data
   for (int i = 0; i < n; i++) {
-    cout << "insert key:" << keys[i] << " value: " << values[i] << endl;
+    //    cout << "insert key:" << keys[i] << " value: " << values[i] << endl;
     tree.Insert(keys[i], values[i]);
   }
   ASSERT_TRUE(tree.Check());
@@ -47,10 +47,11 @@ TEST(BPlusTreeTests, SampleTest) {
     ASSERT_EQ(kv_map[i], ans[i]);
   }
   ASSERT_TRUE(tree.Check());
-  cout << "start delete" << endl;
   // Delete half keys
   for (int i = 0; i < n / 2; i++) {
+    //    cout << "delete " << delete_seq[i] << endl;
     tree.Remove(delete_seq[i]);
+    //    tree.PrintTree(mgr[1]);
   }
   tree.PrintTree(mgr[1]);
   // Check valid

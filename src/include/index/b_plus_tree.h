@@ -81,6 +81,9 @@ private:
   template<typename N>
   N *Split(N *node);
 
+  template <typename N>
+  void UpdateParentKey(N* node);
+
   template<typename N>
   bool CoalesceOrRedistribute(N *node, Transaction *transaction = nullptr);
 
