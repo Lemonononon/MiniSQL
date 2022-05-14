@@ -18,23 +18,22 @@ TEST(TableHeapTest, TableHeapSampleTest) {
   const int row_nums = 1000;
   // create schema
   std::vector<Column *> columns = {
-          ALLOC_COLUMN(heap)("id", TypeId::kTypeInt, 0, false, false),
-          ALLOC_COLUMN(heap)("name", TypeId::kTypeChar, 64, 1, true, false),
-          ALLOC_COLUMN(heap)("account", TypeId::kTypeFloat, 2, true, false)
+      ALLOC_COLUMN(heap)("id", TypeId::kTypeInt, 0, false, false),
+      ALLOC_COLUMN(heap)("name", TypeId::kTypeChar, 64, 1, true, false),
+      ALLOC_COLUMN(heap)("account", TypeId::kTypeFloat, 2, true, false)
   };
   auto schema = std::make_shared<Schema>(columns);
   // create rows
   std::unordered_map<int64_t, Fields *> row_values;
-  std::cout << "ok"<<std::endl;
   TableHeap *table_heap = TableHeap::Create(engine.bpm_, schema.get(), nullptr, nullptr, nullptr, &heap);
   for (int i = 0; i < row_nums; i++) {
     int32_t len = RandomUtils::RandomInt(0, 64);
     char *characters = new char[len];
     RandomUtils::RandomString(characters, len);
     Fields *fields = new Fields{
-            Field(TypeId::kTypeInt, i),
-            Field(TypeId::kTypeChar, const_cast<char *>(characters), len, true),
-            Field(TypeId::kTypeFloat, RandomUtils::RandomFloat(-999.f, 999.f))
+        Field(TypeId::kTypeInt, i),
+        Field(TypeId::kTypeChar, const_cast<char *>(characters), len, true),
+        Field(TypeId::kTypeFloat, RandomUtils::RandomFloat(-999.f, 999.f))
     };
     Row row(*fields);
     table_heap->InsertTuple(row, nullptr);
@@ -47,11 +46,24 @@ TEST(TableHeapTest, TableHeapSampleTest) {
     Row row(RowId(row_kv.first));
     table_heap->GetTuple(&row, nullptr);
     ASSERT_EQ(schema.get()->GetColumnCount(), row.GetFields().size());
-    for (size_t j = 0; j < schema.get()->GetColumnCount(); j++) {
+    for (size_t j = 0; j < schema->GetColumnCount(); j++) {
       ASSERT_EQ(CmpBool::kTrue, row.GetField(j)->CompareEquals(row_kv.second->at(j)));
     }
     // free spaces
     delete row_kv.second;
   }
-}
 
+  int count = 0;
+  for (auto iter = table_heap->Begin(nullptr); iter != table_heap->End(); ++iter) {
+    Row row(iter->GetRowId());
+    table_heap->GetTuple(&row, nullptr);
+    ASSERT_EQ(schema.get()->GetColumnCount(), row.GetFields().size());
+    ASSERT_EQ(schema.get()->GetColumnCount(), iter->GetFields().size());
+    for (size_t j = 0; j < schema->GetColumnCount(); j++) {
+      ASSERT_EQ(CmpBool::kTrue, row.GetField(j)->CompareEquals(*iter->GetField(j)));
+    }
+    count++;
+  }
+  ASSERT_EQ(row_nums, count);
+  remove(db_file_name.c_str());
+}

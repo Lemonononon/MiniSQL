@@ -7,12 +7,19 @@
 #include "record/row.h"
 #include "record/schema.h"
 
-char *chars[] = {const_cast<char *>(""), const_cast<char *>("hello"), const_cast<char *>("world!"),
-                 const_cast<char *>("\0")};
+char *chars[] = {
+    const_cast<char *>(""),
+    const_cast<char *>("hello"),
+    const_cast<char *>("world!"),
+    const_cast<char *>("\0")
+};
 
 Field int_fields[] = {
-    Field(TypeId::kTypeInt, 188), Field(TypeId::kTypeInt, -65537), Field(TypeId::kTypeInt, 33389),
-    Field(TypeId::kTypeInt, 0),   Field(TypeId::kTypeInt, 999),
+    Field(TypeId::kTypeInt, 188),
+    Field(TypeId::kTypeInt, -65537),
+    Field(TypeId::kTypeInt, 33389),
+    Field(TypeId::kTypeInt, 0),
+    Field(TypeId::kTypeInt, 999),
 };
 Field float_fields[] = {
     Field(TypeId::kTypeFloat, -2.33f),
@@ -20,11 +27,15 @@ Field float_fields[] = {
     Field(TypeId::kTypeFloat, 999999.9995f),
     Field(TypeId::kTypeFloat, -77.7f),
 };
-Field char_fields[] = {Field(TypeId::kTypeChar, chars[0], strlen(chars[0]), false),
-                       Field(TypeId::kTypeChar, chars[1], strlen(chars[1]), false),
-                       Field(TypeId::kTypeChar, chars[2], strlen(chars[2]), false),
-                       Field(TypeId::kTypeChar, chars[3], 1, false)};
-Field null_fields[] = {Field(TypeId::kTypeInt), Field(TypeId::kTypeFloat), Field(TypeId::kTypeChar)};
+Field char_fields[] = {
+    Field(TypeId::kTypeChar, chars[0], strlen(chars[0]), false),
+    Field(TypeId::kTypeChar, chars[1], strlen(chars[1]), false),
+    Field(TypeId::kTypeChar, chars[2], strlen(chars[2]), false),
+    Field(TypeId::kTypeChar, chars[3], 1, false)
+};
+Field null_fields[] = {
+    Field(TypeId::kTypeInt), Field(TypeId::kTypeFloat), Field(TypeId::kTypeChar)
+};
 
 TEST(TupleTest, FieldSerializeDeserializeTest) {
   char buffer[PAGE_SIZE];
@@ -53,7 +64,6 @@ TEST(TupleTest, FieldSerializeDeserializeTest) {
     EXPECT_EQ(CmpBool::kTrue, df->CompareLessThanEquals(int_fields[2]));
     heap->Free(df);
     df = nullptr;
-
   }
   for (int i = 0; i < 3; i++) {
     ofs += Field::DeserializeFrom(buffer + ofs, TypeId::kTypeFloat, &df, false, heap);
@@ -64,7 +74,6 @@ TEST(TupleTest, FieldSerializeDeserializeTest) {
     EXPECT_EQ(CmpBool::kTrue, df->CompareLessThanEquals(float_fields[2]));
     heap->Free(df);
     df = nullptr;
-
   }
   for (int i = 0; i < 3; i++) {
     ofs += Field::DeserializeFrom(buffer + ofs, TypeId::kTypeChar, &df, false, heap);
@@ -76,20 +85,22 @@ TEST(TupleTest, FieldSerializeDeserializeTest) {
     heap->Free(df);
     df = nullptr;
   }
-
 }
 
 TEST(TupleTest, RowTest) {
   SimpleMemHeap heap;
   TablePage table_page;
-
   // create schema
-  std::vector<Column *> columns = {ALLOC_COLUMN(heap)("id", TypeId::kTypeInt, 0, false, false),
-                                   ALLOC_COLUMN(heap)("name", TypeId::kTypeChar, 64, 1, true, false),
-                                   ALLOC_COLUMN(heap)("account", TypeId::kTypeFloat, 2, true, false)};
-  std::vector<Field> fields = {Field(TypeId::kTypeInt, 188),
-                               Field(TypeId::kTypeChar, const_cast<char *>("minisql"), strlen("minisql"), false),
-                               Field(TypeId::kTypeFloat, 19.99f)};
+  std::vector<Column *> columns = {
+      ALLOC_COLUMN(heap)("id", TypeId::kTypeInt, 0, false, false),
+      ALLOC_COLUMN(heap)("name", TypeId::kTypeChar, 64, 1, true, false),
+      ALLOC_COLUMN(heap)("account", TypeId::kTypeFloat, 2, true, false)
+  };
+  std::vector<Field> fields = {
+      Field(TypeId::kTypeInt, 188),
+      Field(TypeId::kTypeChar, const_cast<char *>("minisql"), strlen("minisql"), false),
+      Field(TypeId::kTypeFloat, 19.99f)
+  };
   auto schema = std::make_shared<Schema>(columns);
   Row row(fields);
   table_page.Init(0, INVALID_PAGE_ID, nullptr, nullptr);
@@ -106,4 +117,29 @@ TEST(TupleTest, RowTest) {
   }
   ASSERT_TRUE(table_page.MarkDelete(row.GetRowId(), nullptr, nullptr, nullptr));
   table_page.ApplyDelete(row.GetRowId(), nullptr, nullptr);
+
+  for (int i = 0; i < 3; i++) {
+    void* mem = heap.Allocate(columns[i]->GetSerializedSize());
+    columns[i]->SerializeTo((char*)mem);
+    Column* col;
+    Column::DeserializeFrom((char*)mem, col, &heap);
+    ASSERT_EQ(columns[i]->GetName(), col->GetName());
+    ASSERT_EQ(columns[i]->GetType(), col->GetType());
+    ASSERT_EQ(columns[i]->GetLength(), col->GetLength());
+    ASSERT_EQ(columns[i]->IsNullable(), col->IsNullable());
+    ASSERT_EQ(columns[i]->GetTableInd(), col->GetTableInd());
+  }
+
+  void* mem = heap.Allocate(schema->GetSerializedSize());
+  schema->SerializeTo((char*)mem);
+  Schema* sch;
+  Schema::DeserializeFrom((char*)mem, sch, &heap);
+  ASSERT_EQ(schema->GetColumnCount(), sch->GetColumnCount());
+  for (uint32_t i = 0; i < schema->GetColumnCount(); i++) {
+    ASSERT_EQ(schema->GetColumn(i)->GetName(), sch->GetColumn(i)->GetName());
+    ASSERT_EQ(schema->GetColumn(i)->GetType(), sch->GetColumn(i)->GetType());
+    ASSERT_EQ(schema->GetColumn(i)->GetLength(), sch->GetColumn(i)->GetLength());
+    ASSERT_EQ(schema->GetColumn(i)->IsNullable(), sch->GetColumn(i)->IsNullable());
+    ASSERT_EQ(schema->GetColumn(i)->GetTableInd(), sch->GetColumn(i)->GetTableInd());
+  }
 }
