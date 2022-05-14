@@ -9,7 +9,10 @@ INDEX_TEMPLATE_ARGUMENTS
 class IndexIterator {
 public:
   // you may define your own constructor based on your member variables
-  explicit IndexIterator();
+  explicit IndexIterator( const KeyType & key, KeyComparator *comparator);
+
+  //type:true-begin, false-end
+  explicit IndexIterator( bool type, KeyComparator *comparator);
 
   ~IndexIterator();
 
@@ -27,6 +30,10 @@ public:
 
 private:
   // add your own private member variables here
+ IndexIterator *next;
+ MappingType data;
+ KeyComparator *comparator_;
+// KeyType key_;
 };
 
 
