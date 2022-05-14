@@ -122,10 +122,15 @@ bool BufferPoolManager::DeletePage(page_id_t page_id) {
   // 2.   If P exists, but has a non-zero pin-count, return false. Someone is using the page.
   // 3.   Otherwise, P can be deleted. Remove P from the page table, reset its metadata and return it to the free list.
   if (page_table_.find(page_id) == page_table_.end()) {
+    // 如果不在内存里，直接从硬盘中删除
+    DeallocatePage(page_id);
     return true;
   } else if (pages_[page_table_[page_id]].pin_count_ > 0) {
+    // 如果在内存中而被pin，则不能删除
     return false;
   } else {
+    // 如果在内存中而没有被pin，则删除，并从replacer移除
+    replacer_->Pin(page_table_[page_id]);
     DeallocatePage(page_id);
     pages_[page_table_[page_id]].ResetMemory();
     pages_[page_table_[page_id]].is_dirty_ = false;
