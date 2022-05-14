@@ -62,9 +62,19 @@ public:
 
   void Init(IndexMetadata *meta_data, TableInfo *table_info, BufferPoolManager *buffer_pool_manager) {
     // Step1: init index metadata and table info
+    meta_data_ = meta_data;
+    table_info_ = table_info;
     // Step2: mapping index key to key schema
+    vector<uint32_t> column_index;
+    // 从table_info_中获取columns_
+    vector<Column *> my_columns_ = table_info_->GetSchema()->GetColumns();
+    // 将每一个column在table中的序号push到column_index中
+    for(auto & my_column : my_columns_){
+      column_index.push_back(my_column->GetTableInd());
+    }
+    key_schema_ = Schema::ShallowCopySchema(table_info_->GetSchema(),column_index,heap_);
     // Step3: call CreateIndex to create the index
-    ASSERT(false, "Not Implemented yet.");
+    index_ = CreateIndex(buffer_pool_manager);
   }
 
   inline Index *GetIndex() { return index_; }
