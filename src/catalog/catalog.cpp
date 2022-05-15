@@ -1,5 +1,5 @@
 #include "catalog/catalog.h"
-
+using namespace std;
 /*
  * 序列化catalog的meta_data,看似不需要像record里面那样返回偏移值
  * 序列化顺序:
@@ -40,13 +40,49 @@ void CatalogMeta::SerializeTo(char *buf) const {
 }
 
 CatalogMeta *CatalogMeta::DeserializeFrom(char *buf, MemHeap *heap) {
-  // ASSERT(false, "Not Implemented yet");
-  return nullptr;
+  // 在给定的内存池里new 一个 catalogMeta
+  auto *De = new (heap->Allocate(sizeof(CatalogMeta))) CatalogMeta();
+  // DeserializeForm
+  // check magic number
+  if (MACH_READ_UINT32(buf) != CATALOG_METADATA_MAGIC_NUM) {
+    cout << "ERROR: NOT CATALOGMETA MAGIC_NUMBER!" << endl;
+    return nullptr;
+  }
+  buf += 4;
+  // read size
+  int32_t table_meta_pages_size = MACH_READ_INT32(buf);
+  buf += 4;
+  int32_t index_meta_pages_size = MACH_READ_INT32(buf);
+  buf += 4;
+  // read into table_meta_pages_
+  uint32_t table_id_t;
+  int32_t page_id_t;
+  for (int i = 0; i < table_meta_pages_size; i++) {
+    table_id_t = MACH_READ_UINT32(buf);
+    buf += 4;
+    page_id_t = MACH_READ_INT32(buf);
+    buf += 4;
+    De->table_meta_pages_[table_id_t] = page_id_t;
+  }
+  // read into index_meta_pages
+  uint32_t index_id_t;
+  for (int i = 0; i < index_meta_pages_size; i++) {
+    index_id_t = MACH_READ_UINT32(buf);
+    buf += 4;
+    page_id_t = MACH_READ_INT32(buf);
+    buf += 4;
+    De->index_meta_pages_[index_id_t] = page_id_t;
+  }
+
+  return De;
 }
 
+/* 返回序列化的大小
+ * 有可能有问题，比如说在序列化之后，index_meta_pages_和table_meta_pages_又发生了变化
+ */
 uint32_t CatalogMeta::GetSerializedSize() const {
-  // ASSERT(false, "Not Implemented yet");
-  return 0;
+  // magic_number(4)+table_meta_size(4)+index_meta_size(4)+8*each_element_in_map
+  return 12 + 8 * (table_meta_pages_.size() + index_meta_pages_.size());
 }
 
 CatalogMeta::CatalogMeta() {}
