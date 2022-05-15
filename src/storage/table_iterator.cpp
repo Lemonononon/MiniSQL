@@ -18,7 +18,7 @@ inline bool TableIterator::operator==(const TableIterator &itr) const {
   return row_->GetRowId() == itr.row_->GetRowId() ? true : false;
 }
 
-inline bool TableIterator::operator!=(const TableIterator &itr) const {
+bool TableIterator::operator!=(const TableIterator &itr) const {
   return row_->GetRowId() == itr.row_->GetRowId() ? false : true;
 }
 

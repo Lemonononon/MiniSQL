@@ -433,7 +433,8 @@ INDEX_TEMPLATE_ARGUMENTS
 INDEXITERATOR_TYPE BPLUSTREE_TYPE::Begin() {
   KeyType key{};
   Page * page = FindLeafPage(key, true);
-  return INDEXITERATOR_TYPE(true, &comparator_, page, buffer_pool_manager_);
+  auto leaf_page = reinterpret_cast<B_PLUS_TREE_LEAF_PAGE_TYPE *>(page->GetData());
+  return INDEXITERATOR_TYPE(true, &comparator_, leaf_page, buffer_pool_manager_);
 }
 
 /*
@@ -443,10 +444,8 @@ INDEXITERATOR_TYPE BPLUSTREE_TYPE::Begin() {
  */
 INDEX_TEMPLATE_ARGUMENTS
 INDEXITERATOR_TYPE BPLUSTREE_TYPE::Begin(const KeyType &key) {
-  Page *leaf_page = FindLeafPage(key, false);
-  KeyType key{};
-  Page *leaf_page = FindLeafPage(key, true);
-  //end传的page跟begin一样，都是left most，后续工作在index_iterator中进行
+  Page *page = FindLeafPage(key, false);
+  auto leaf_page = reinterpret_cast<B_PLUS_TREE_LEAF_PAGE_TYPE *>(page->GetData());
   return INDEXITERATOR_TYPE(false, &comparator_, leaf_page, buffer_pool_manager_);
 }
 
@@ -457,7 +456,11 @@ INDEXITERATOR_TYPE BPLUSTREE_TYPE::Begin(const KeyType &key) {
  */
 INDEX_TEMPLATE_ARGUMENTS
 INDEXITERATOR_TYPE BPLUSTREE_TYPE::End() {
-  return INDEXITERATOR_TYPE(false, &comparator_);
+  //end传的page跟begin一样，都是left most，后续工作在index_iterator中进行
+  KeyType key{};
+  Page *page = FindLeafPage(key, true);
+  auto leaf_page = reinterpret_cast<B_PLUS_TREE_LEAF_PAGE_TYPE *>(page->GetData());
+  return INDEXITERATOR_TYPE(false, &comparator_, leaf_page, buffer_pool_manager_);
 }
 
 /*****************************************************************************

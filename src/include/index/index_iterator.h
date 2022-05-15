@@ -9,10 +9,10 @@ INDEX_TEMPLATE_ARGUMENTS
 class IndexIterator {
 public:
   // you may define your own constructor based on your member variables
-  explicit IndexIterator( const KeyType & key, KeyComparator *comparator, Page *, BufferPoolManager *buffer_pool_manager);
+  explicit IndexIterator( const KeyType & key, KeyComparator *comparator, B_PLUS_TREE_LEAF_PAGE_TYPE *, BufferPoolManager *buffer_pool_manager);
 
   //type:true-begin, false-end
-  explicit IndexIterator( bool type, KeyComparator *comparator, Page *, BufferPoolManager *buffer_pool_manager);
+  explicit IndexIterator( bool type, KeyComparator *comparator, B_PLUS_TREE_LEAF_PAGE_TYPE *, BufferPoolManager *buffer_pool_manager);
 
   ~IndexIterator();
 
@@ -29,9 +29,8 @@ public:
   bool operator!=(const IndexIterator &itr) const;
 
 private:
-  // add your own private member variables here
+ MappingType data_;
  int index_; //用来取值的index，0 ~ size-1
- int size_; //当前结点的size
  B_PLUS_TREE_LEAF_PAGE_TYPE *page_; //目前在哪个结点
  KeyComparator *comparator_;
  BufferPoolManager *buffer_pool_manager_;
