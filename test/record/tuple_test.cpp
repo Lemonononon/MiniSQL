@@ -122,7 +122,7 @@ TEST(TupleTest, RowTest) {
     void* mem = heap.Allocate(columns[i]->GetSerializedSize());
     columns[i]->SerializeTo((char*)mem);
     Column* col;
-    Column::DeserializeFrom((char*)mem, col, &heap);
+    Column::DeserializeFrom((char*)mem,col, &heap);
     ASSERT_EQ(columns[i]->GetName(), col->GetName());
     ASSERT_EQ(columns[i]->GetType(), col->GetType());
     ASSERT_EQ(columns[i]->GetLength(), col->GetLength());

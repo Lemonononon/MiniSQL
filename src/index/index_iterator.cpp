@@ -32,8 +32,9 @@ INDEX_TEMPLATE_ARGUMENTS INDEXITERATOR_TYPE &INDEXITERATOR_TYPE::operator++() {
 
 INDEX_TEMPLATE_ARGUMENTS
 bool INDEXITERATOR_TYPE::operator==(const IndexIterator &itr) const {
-  KeyComparator kc(*comparator_);
-  return kc( key_, itr.key_) == 0;
+  //KeyComparator kc(*comparator_);
+  //return kc( key_, itr.key_) == 0;
+    return false;
 }
 
 INDEX_TEMPLATE_ARGUMENTS
