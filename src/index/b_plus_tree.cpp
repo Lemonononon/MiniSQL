@@ -491,7 +491,19 @@ Page *BPLUSTREE_TYPE::FindLeafPage(const KeyType &key, bool leftMost) {
  * updating it.
  */
 INDEX_TEMPLATE_ARGUMENTS
-void BPLUSTREE_TYPE::UpdateRootPageId(int insert_record) {}
+void BPLUSTREE_TYPE::UpdateRootPageId(int insert_record) {
+  auto index_roots_page = buffer_pool_manager_->FetchPage(INDEX_ROOTS_PAGE_ID);
+  if (index_roots_page == nullptr) {
+    throw Exception("out of memory");
+  }
+  auto index_roots = reinterpret_cast<IndexRootsPage *>(index_roots_page->GetData());
+  if (insert_record) {
+    index_roots->Insert(index_id_, root_page_id_);
+  } else {
+    index_roots->Update(index_id_, root_page_id_);
+  }
+  buffer_pool_manager_->UnpinPage(INDEX_ROOTS_PAGE_ID, true);
+}
 
 /**
  * This method is used for debug only, You don't need to modify
