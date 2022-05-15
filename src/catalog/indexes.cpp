@@ -8,6 +8,7 @@ IndexMetadata *IndexMetadata::Create(const index_id_t index_id, const string &in
 }
 /*
  * 序列化IndexMetadata,虽然文档和头文件都没有给出提示，但是根据part2猜测返回值应该是偏移量
+ * 在此处没有储存string的长度，而是试图直接用MACH_READ_FROM的方法来读取string,可能会有问题
  * 序列化顺序:
  * 1.magic_num
  * 2.index_id_
