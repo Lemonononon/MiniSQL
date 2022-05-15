@@ -14,11 +14,11 @@ TableIterator::TableIterator(const TableIterator &other) {
 
 TableIterator::~TableIterator() { delete row_; }
 
-bool TableIterator::operator==(const TableIterator &itr) const {
+inline bool TableIterator::operator==(const TableIterator &itr) const {
   return row_->GetRowId() == itr.row_->GetRowId() ? true : false;
 }
 
-bool TableIterator::operator!=(const TableIterator &itr) const {
+inline bool TableIterator::operator!=(const TableIterator &itr) const {
   return row_->GetRowId() == itr.row_->GetRowId() ? false : true;
 }
 

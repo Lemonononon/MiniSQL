@@ -431,7 +431,9 @@ bool BPLUSTREE_TYPE::AdjustRoot(BPlusTreePage *old_root_node) {
  */
 INDEX_TEMPLATE_ARGUMENTS
 INDEXITERATOR_TYPE BPLUSTREE_TYPE::Begin() {
-  return INDEXITERATOR_TYPE(true, &comparator_);
+  KeyType key{};
+  Page * page = FindLeafPage(key, true);
+  return INDEXITERATOR_TYPE(true, &comparator_, page, buffer_pool_manager_);
 }
 
 /*
@@ -441,7 +443,11 @@ INDEXITERATOR_TYPE BPLUSTREE_TYPE::Begin() {
  */
 INDEX_TEMPLATE_ARGUMENTS
 INDEXITERATOR_TYPE BPLUSTREE_TYPE::Begin(const KeyType &key) {
-  return INDEXITERATOR_TYPE(key, &comparator_);
+  Page *leaf_page = FindLeafPage(key, false);
+  KeyType key{};
+  Page *leaf_page = FindLeafPage(key, true);
+  //end传的page跟begin一样，都是left most，后续工作在index_iterator中进行
+  return INDEXITERATOR_TYPE(false, &comparator_, leaf_page, buffer_pool_manager_);
 }
 
 /*

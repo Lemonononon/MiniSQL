@@ -38,19 +38,22 @@ uint32_t Column::SerializeTo(char *buf) const {
   // 写入的顺序以及字节大小：
   // 1.magic_num 4 2.name长度 4 3.name实际数据 name.size()*1 4.type_id(enum类型实际都是int) 4
   // 5.len_ 4      6.table_ind_ 4 7.nullable_ 1 8.unique_ 1
-
   uint32_t ofs = 0;
+  // write magic num
+  MACH_WRITE_UINT32(buf, COLUMN_MAGIC_NUM);
+  buf += 4;
+  ofs += 4;
   // write column name
   MACH_WRITE_UINT32(buf, name_.size());
-  buf += 4;
-  ofs += 4;
+  buf+=4;
+  ofs+=4;
   MACH_WRITE_STRING(buf, name_);
-  buf += MACH_STR_SERIALIZED_SIZE(name_);
-  ofs += MACH_STR_SERIALIZED_SIZE(name_);
+  buf += name_.length();
+  ofs += name_.length();
   // write type_id
-  MACH_WRITE_UINT32(buf, type_);
-  buf += 4;
-  ofs += 4;
+  MACH_WRITE_TO(TypeId, buf, type_);
+  buf += sizeof(TypeId);
+  ofs += sizeof(TypeId);
   // write len_
   MACH_WRITE_UINT32(buf, len_);
   buf += 4;
@@ -73,16 +76,19 @@ uint32_t Column::SerializeTo(char *buf) const {
 uint32_t Column::GetSerializedSize() const {
   // replace with your code here
   // 具体见SerializeTo
-  return MACH_STR_SERIALIZED_SIZE(name_) + 18;
+  return name_.length() + 18 + sizeof(TypeId);
 }
 
 uint32_t Column::DeserializeFrom(char *buf, Column *&column, MemHeap *heap) {
   // replace with your code here
-
   // test if empty
-  ASSERT(column == nullptr, "Pointer to column is not null in column deserialize.");
+  ASSERT(column != nullptr, "Pointer to column is not null in column deserialize.");
   uint32_t ofs = 0;
   /* deserialize field from buf */
+  // read magic num
+  ASSERT(MACH_READ_UINT32(buf) == 210928, "Not column!");
+  buf += 4;
+  ofs += 4;
   // read name length
   uint32_t len = MACH_READ_UINT32(buf);
   buf += 4;
@@ -94,11 +100,11 @@ uint32_t Column::DeserializeFrom(char *buf, Column *&column, MemHeap *heap) {
     name[i] = MACH_READ_FROM(char, buf);
     buf++;
   }
-  std::string column_name (name);
+  std::string column_name(name);
   // read type
   TypeId type = MACH_READ_FROM(TypeId, buf);
-  buf += 4;
-  ofs += 4;
+  buf += sizeof(TypeId);
+  ofs += sizeof(TypeId);
   // read len_
   uint32_t l = MACH_READ_UINT32(buf);
   buf += 4;
@@ -116,8 +122,11 @@ uint32_t Column::DeserializeFrom(char *buf, Column *&column, MemHeap *heap) {
   buf++;
   ofs++;
   // 将新生成的对象放到heap中
-  column = ALLOC_P(heap, Column)(column_name, type, l, col_ind, Nullable,
-                                 uni);
+  if (type == kTypeChar) {
+    column = ALLOC_P(heap, Column)(column_name, type, l, col_ind, Nullable, uni);
+  } else {
+    column = ALLOC_P(heap, Column)(column_name, type, col_ind, Nullable, uni);
+  }
   // return ofs
   return ofs;
 }
