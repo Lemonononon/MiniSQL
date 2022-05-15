@@ -91,9 +91,10 @@ private:
   explicit IndexInfo() : meta_data_{nullptr}, index_{nullptr}, table_info_{nullptr},
                          key_schema_{nullptr}, heap_(new SimpleMemHeap()) {}
 
+  //我严重怀疑这个函数我写的有问题，到时候可能需要重点关注一下
   Index *CreateIndex(BufferPoolManager *buffer_pool_manager) {
-    ASSERT(false, "Not Implemented yet.");
-    return nullptr;
+    return new BPlusTreeIndex<index_id_t,IndexSchema *,BufferPoolManager*>
+        (meta_data_->GetIndexId(),key_schema_,buffer_pool_manager);
   }
 
 private:

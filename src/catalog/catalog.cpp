@@ -92,7 +92,19 @@ CatalogManager::CatalogManager(BufferPoolManager *buffer_pool_manager, LockManag
     : buffer_pool_manager_(buffer_pool_manager),
       lock_manager_(lock_manager),
       log_manager_(log_manager),
-      heap_(new SimpleMemHeap()) {}
+      heap_(new SimpleMemHeap()) {
+  //实例化一个新的CatalogMeta
+  catalog_meta_ = CatalogMeta::NewInstance(heap_);
+  //首次新建数据库
+  if(init){
+
+  }
+  else{
+
+  }
+
+
+}
 
 CatalogManager::~CatalogManager() { delete heap_; }
 
