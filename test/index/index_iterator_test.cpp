@@ -2,6 +2,7 @@
 #include "gtest/gtest.h"
 #include "index/b_plus_tree.h"
 #include "index/basic_comparator.h"
+#include "utils/tree_file_mgr.h"
 
 static const std::string db_name = "bp_tree_insert_test.db";
 
@@ -26,6 +27,8 @@ TEST(BPlusTreeTests, IndexIteratorTest) {
     ASSERT_TRUE(tree.GetValue(i, v));
     ASSERT_EQ(i * 100, v[v.size() - 1]);
   }
+  TreeFileManagers mgr("tree_");
+  tree.PrintTree(mgr[0]);
   // Iterator
   int ans = 1;
   for (auto iter = tree.Begin(); iter != tree.End(); ++iter, ans += 2) {
