@@ -12,11 +12,14 @@ TEST(BPlusTreeTests, IndexIteratorTest) {
   BasicComparator<int> comparator;
   BPlusTree<int, int, BasicComparator<int>> tree(0, engine.bpm_, comparator, 4, 4);
   // Insert and delete record
+  TreeFileManagers mgr("tree_");
   for (int i = 1; i <= 50; i++) {
     tree.Insert(i, i * 100, nullptr);
+//    tree.PrintTree(mgr[0]);
   }
   for (int i = 2; i <= 50; i += 2) {
     tree.Remove(i);
+//    tree.PrintTree(mgr[1]);
   }
   // Search keys
   vector<int> v;
@@ -27,7 +30,7 @@ TEST(BPlusTreeTests, IndexIteratorTest) {
     ASSERT_TRUE(tree.GetValue(i, v));
     ASSERT_EQ(i * 100, v[v.size() - 1]);
   }
-  TreeFileManagers mgr("tree_");
+//  TreeFileManagers mgr("tree_");
   tree.PrintTree(mgr[0]);
   // Iterator
   int ans = 1;

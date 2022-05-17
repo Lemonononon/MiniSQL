@@ -1,6 +1,7 @@
 #include "page/b_plus_tree_internal_page.h"
 #include "index/basic_comparator.h"
 #include "index/generic_key.h"
+#include "utils/exception.h"
 
 //****************************HELPER METHODS AND UTILITIES***************************
 
@@ -225,6 +226,13 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveFirstToEndOf(BPlusTreeInternalPage *rec
                                                       BufferPoolManager *buffer_pool_manager) {
   SetKeyAt(0, middle_key);
   recipient->CopyLastFrom(array_[0], buffer_pool_manager);
+  auto child_page = buffer_pool_manager->FetchPage(array_[0].second);
+  if (child_page == nullptr) {
+    throw Exception("out of memory");
+  }
+  auto child = reinterpret_cast<BPlusTreePage*>(child_page);
+  child->SetParentPageId(recipient->GetPageId());
+  buffer_pool_manager->UnpinPage(array_[0].second, true);
   for (int i = 0; i < GetSize() - 1; ++i) {
     array_[i] = array_[i + 1];
   }
@@ -253,6 +261,13 @@ void B_PLUS_TREE_INTERNAL_PAGE_TYPE::MoveLastToFrontOf(BPlusTreeInternalPage *re
                                                        BufferPoolManager *buffer_pool_manager) {
   recipient->SetKeyAt(0, middle_key);
   recipient->CopyFirstFrom(array_[GetSize() - 1], buffer_pool_manager);
+  auto child_page = buffer_pool_manager->FetchPage(array_[GetSize() - 1].second);
+  if (child_page == nullptr) {
+    throw Exception("out of memory");
+  }
+  auto child = reinterpret_cast<BPlusTreePage*>(child_page);
+  child->SetParentPageId(recipient->GetPageId());
+  buffer_pool_manager->UnpinPage(array_[GetSize() - 1].second, true);
   IncreaseSize(-1);
 }
 
