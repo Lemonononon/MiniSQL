@@ -53,7 +53,7 @@ INDEX_TEMPLATE_ARGUMENTS INDEXITERATOR_TYPE &INDEXITERATOR_TYPE::operator++() {
         index_ = 0;
       }else{
         //返回end
-        return end_iter;
+        *this =  end_iter;
       }
     }
     return *this;
