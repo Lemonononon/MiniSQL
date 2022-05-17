@@ -18,11 +18,11 @@
  * --------------------------------------------
  * | Field Nums | Null bitmap |
  * -------------------------------------------
- *  
+ *
  *
  */
 class Row {
-public:
+ public:
   /**
    * Row used for insert
    * Field integrity should check by upper level
@@ -31,7 +31,7 @@ public:
     // deep copy
     for (auto &field : fields) {
       void *buf = heap_->Allocate(sizeof(Field));
-      fields_.push_back(new(buf)Field(field));
+      fields_.push_back(new (buf) Field(field));
     }
   }
 
@@ -58,12 +58,13 @@ public:
     rid_ = other.rid_;
     for (auto &field : other.fields_) {
       void *buf = heap_->Allocate(sizeof(Field));
-      fields_.push_back(new(buf)Field(*field));
+      fields_.push_back(new (buf) Field(*field));
     }
   }
 
   virtual ~Row() {
     delete heap_;
+    heap_ = nullptr;
   }
 
   /**
@@ -93,13 +94,13 @@ public:
 
   inline size_t GetFieldCount() const { return fields_.size(); }
 
-private:
+ private:
   Row &operator=(const Row &other) = delete;
 
-private:
+ private:
   RowId rid_{};
-  std::vector<Field *> fields_;   /** Make sure that all fields are created by mem heap */
+  std::vector<Field *> fields_; /** Make sure that all fields are created by mem heap */
   MemHeap *heap_{nullptr};
 };
 
-#endif //MINISQL_TUPLE_H
+#endif  // MINISQL_TUPLE_H

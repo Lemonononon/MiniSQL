@@ -12,7 +12,7 @@ TableIterator::TableIterator(const TableIterator &other) {
   row_ = other.row_;
 }
 
-TableIterator::~TableIterator() { delete row_; }
+TableIterator::~TableIterator() {delete row_;}
 
 inline bool TableIterator::operator==(const TableIterator &itr) const {
   return row_->GetRowId() == itr.row_->GetRowId() ? true : false;

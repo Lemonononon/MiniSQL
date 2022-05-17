@@ -12,6 +12,8 @@ bool TablePage::InsertTuple(Row &row, Schema *schema, Transaction *txn,
                             LockManager *lock_manager, LogManager *log_manager) {
   uint32_t serialized_size = row.GetSerializedSize(schema);
   ASSERT(serialized_size > 0, "Can not have empty row.");
+  uint32_t tuple_num = GetTupleCount();
+  tuple_num++;
   if (GetFreeSpaceRemaining() < serialized_size + SIZE_TUPLE) {
     return false;
   }
