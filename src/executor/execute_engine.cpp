@@ -5,6 +5,8 @@
 
 #define ENABLE_EXECUTE_DEBUG
 
+string path = "./db/";
+
 ExecuteEngine::ExecuteEngine() {
   cout << " __  __ _       _  _____  ____  _" << endl;
   cout << "|  \\/  (_)     (_)/ ____|/ __ \\| |" << endl;
@@ -14,7 +16,6 @@ ExecuteEngine::ExecuteEngine() {
   cout << "|_|  |_|_|_| |_|_|_____/ \\___\\_\\______|" << endl;
   cout << endl;
   vector<string> db_files;
-  string path = "./db/";
   GetFiles(path, db_files);
   if (db_files.size() == 0) {
     cout << "no database to be loaded" << endl;
@@ -82,7 +83,9 @@ dberr_t ExecuteEngine::ExecuteCreateDatabase(pSyntaxNode ast, ExecuteContext *co
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteCreateDatabase" << std::endl;
 #endif
-  return DB_FAILED;
+  dbs_.emplace(ast->child_->val_, new DBStorageEngine(path+ast->child_->val_+".db"));
+  cout << "Create " << ast->child_->val_ << " OK" << endl;
+  return DB_SUCCESS;
 }
 
 dberr_t ExecuteEngine::ExecuteDropDatabase(pSyntaxNode ast, ExecuteContext *context) {
