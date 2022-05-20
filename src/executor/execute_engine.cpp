@@ -1,6 +1,7 @@
 #include "executor/execute_engine.h"
 #include "glog/logging.h"
 #include "utils/get_files.h"
+#include <iomanip>
 
 #define ENABLE_EXECUTE_DEBUG
 
@@ -20,7 +21,7 @@ ExecuteEngine::ExecuteEngine() {
   } else {
     for (auto db_file : db_files) {
       cout << "loading " << db_file << "... ";
-      dbs_.emplace(db_file, new DBStorageEngine(path+db_file, false));
+      dbs_.emplace(db_file.substr(0, db_file.size()-3), new DBStorageEngine(path+db_file, false));
       cout << "success!" << endl;
     }
   }
@@ -95,7 +96,20 @@ dberr_t ExecuteEngine::ExecuteShowDatabases(pSyntaxNode ast, ExecuteContext *con
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteShowDatabases" << std::endl;
 #endif
-  return DB_FAILED;
+  int max_length = 8;
+  for (auto db : dbs_) {
+    if ((int)db.first.length() > max_length) {
+      max_length = (int)db.first.length();
+    }
+  }
+  cout << "+-" << setw(max_length) << setfill('-') << "-" << "-+" << endl;
+  cout << "| " << setw(max_length) << setfill(' ') << left << "Database" << " |" << endl;
+  cout << "+-" << setw(max_length) << setfill('-') << "-" << "-+" << endl;
+  for (auto db : dbs_) {
+    cout << "| " << setw(max_length) << setfill(' ') << left << db.first << " |" << endl;
+  }
+  cout << "+-" << setw(max_length) << setfill('-') << "-" << "-+" << endl;
+  return DB_SUCCESS;
 }
 
 dberr_t ExecuteEngine::ExecuteUseDatabase(pSyntaxNode ast, ExecuteContext *context) {
