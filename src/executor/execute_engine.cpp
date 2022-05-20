@@ -1,8 +1,31 @@
 #include "executor/execute_engine.h"
 #include "glog/logging.h"
+#include "utils/get_files.h"
+
+#define ENABLE_EXECUTE_DEBUG
 
 ExecuteEngine::ExecuteEngine() {
-
+  cout << " __  __ _       _  _____  ____  _" << endl;
+  cout << "|  \\/  (_)     (_)/ ____|/ __ \\| |" << endl;
+  cout << "| \\  / |_ _ __  _| (___ | |  | | |" << endl;
+  cout << "| |\\/| | | '_ \\| |\\___ \\| |  | | |" << endl;
+  cout << "| |  | | | | | | |____) | |__| | |____" << endl;
+  cout << "|_|  |_|_|_| |_|_|_____/ \\___\\_\\______|" << endl;
+  cout << endl;
+  vector<string> db_files;
+  string path = "./db/";
+  GetFiles(path, db_files);
+  if (db_files.size() == 0) {
+    cout << "no database to be loaded" << endl;
+  } else {
+    for (auto db_file : db_files) {
+      cout << "loading " << db_file << "... ";
+      dbs_.emplace(db_file, new DBStorageEngine(path+db_file, false));
+      cout << "success!" << endl;
+    }
+  }
+  cout << endl;
+  // DBStorageEngine(path+"test.db"); //可以创建一个合法的test.db，要求./db目录存在
 }
 
 dberr_t ExecuteEngine::Execute(pSyntaxNode ast, ExecuteContext *context) {
