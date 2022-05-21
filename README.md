@@ -70,6 +70,97 @@ Least Recently Used算法，将最近最少使用的数据页回收。具体的�
 
 ## Record Manager
 
+第二章比较主要的内容就是序列化与反序列化了，所以先进行一波简单的介绍。
+
+### Serialize (序列化)
+
+简单来说，就是将我们minisql中的`row`、`column`、`schema`、`field`等对象以字节流(char*)的方式储存在硬盘中，使他被持续化地储存，并可以在需要时通过反序列化操作读出我们想要的数据。
+
+例子：
+
+```cpp
+void SerializeA(char *buf, A &a) {
+    // 将id写入到buf中, 占用4个字节, 并将buf向后推4个字节
+    WriteIntToBuffer(&buf, a.id, 4);
+    WriteIntToBuffer(&buf, strlen(a.name), 4);
+    WriteStrToBuffer(&buf, a.name, strlen(a.name));
+}
+```
+
+### Deserialize (反序列化)
+
+反序列化就是从disk中读出所存的内容，将以char方式存在disk中的数据读出并存到`row`、`column`、`schema`、`field`等对象中。总得来说，序列化与反序列化操作是对称的，具体实现可以看代码。
+
+例子：
+
+```cpp
+void DeserializeA(char *buf, A *&a) {
+    a = new A();
+    // 从buf中读4字节, 写入到id中, 并将buf向后推4个字节
+    a->id = ReadIntFromBuffer(&buf, 4);
+    // 获取name的长度len
+    auto len = ReadIntFromBuffer(&buf, 4);
+    a->name = new char[len];
+    // 从buf中读取len个字节拷贝到A.name中, 并将buf向后推len个字节
+    ReadStrFromBuffer(&buf, a->name, len);
+}
+```
+
+### Rowid
+
+对于数据表中的每一行记录，都有一个唯一标识符`RowId`（`src/include/common/rowid.h`）与之对应。`RowId`同时具有逻辑和物理意义，在物理意义上，它是一个64位整数，是每行记录的唯一标识；而在逻辑意义上，它的高32位存储的是该`RowId`对应记录所在数据页的`page_id`，低32位存储的是该`RowId`在`page_id`对应的数据页中对应的是第几条记录，即`slot_num`。
+
+### Table Heap
+
+简单来说，一个table heap里面以双向链表的方式储存了许多的table page，而table page里又存了一个又一个的row。此时要想定位一个row，就需要用到我们说的rowid了，通过高32位获取page_id，低32位获取在该page中的位置。	
+
+### TableHeap:InsertTuple(&row, *txn)
+
+传入要插入的row的指针，我们遍历整个tableheap中的所有page，找到容纳该row的位置并插入，同时用该插入位置生成rowid赋值给row指针，从而实现输出的效果。若成功插入就返回true，否则输出false。
+
+### TableHeap:UpdateTuple(&new_row, &rid, *txn)
+
+将`RowId`为`rid`的记录`old_row`替换成新的记录`new_row`，并将`new_row`的`RowId`通过`new_row.rid_`返回。
+
+*这里在实现的时候由于助教改了需求，所以目前有一些小的瑕疵，但我决定最后debug需要修改时再说（*
+
+### TableHeap:ApplyDelete(&rid, *txn)
+
+```
+// Step1: Find the page which contains the tuple.
+// Step2: Delete the tuple from the page.
+// Find the page which contains the tuple.
+```
+
+很简单，没啥好说的
+
+###  TableHeap:GetTuple(*row, *txn)
+
+获取`RowId`为`row->rid_`的记录，同样没啥好说的
+
+### TableIterator
+
+堆表记录迭代器是可以遍历整个heap中所有page的所有row的迭代器，通过iterator++来移动迭代器达到遍历heap的效果。
+
+![image-20220522002930501](C:\Users\夏恩博\AppData\Roaming\Typora\typora-user-images\image-20220522002930501.png)
+
+### TableIterator TableHeap::Begin(Transaction *txn)
+
+获取堆表的首条记录，作为初始迭代器
+
+### TableIterator TableHeap::End()
+
+用INVALID_ROWID标注end,此时rowid=(page_id,slot_id)=(-1,0)
+
+![image-20220522003230389](C:\Users\夏恩博\AppData\Roaming\Typora\typora-user-images\image-20220522003230389.png)
+
+### 本模块的注意事项
+
++ 用到了bufferpool中的许多函数
++ 许多基本功能其实都已经由tablepage写好，我的工作主要是加了许多逻辑的判断
++ 在读写page前都需要上锁,完成后解锁并unpinpage。 RLatch()、RULatch()、WLatch()、WULatch()、buffer_pool_manager_->UnpinPage（）
++ txn为bonus中需要自己实现的，可以用来优化row读写的辅助结构，目前没啥思路
++ 另外一个bonus为更改float的实现方式来降低精度损失，我觉得看起来好像可以做做（整个完成后）
 
 
 ## Index Manager

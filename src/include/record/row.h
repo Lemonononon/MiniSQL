@@ -65,6 +65,7 @@ class Row {
   virtual ~Row() {
     delete heap_;
     heap_ = nullptr;
+
   }
 
   /**

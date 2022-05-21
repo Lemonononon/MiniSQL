@@ -152,6 +152,6 @@ TableIterator TableHeap::Begin(Transaction *txn) {
 }
 
 TableIterator TableHeap::End() {
-  // 用nullptr标注end,此时rowid=(page_id,slot_id)=(-1,0)
+  // 用INVALID_ROWID标注end,此时rowid=(page_id,slot_id)=(-1,0)
   return TableIterator(this,INVALID_ROWID);
 }
