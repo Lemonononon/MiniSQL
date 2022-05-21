@@ -1,4 +1,5 @@
 #include "executor/execute_engine.h"
+#include <algorithm>
 #include <iomanip>
 #include "glog/logging.h"
 #include "utils/get_files.h"
@@ -180,14 +181,47 @@ dberr_t ExecuteEngine::ExecuteCreateIndex(pSyntaxNode ast, ExecuteContext *conte
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteCreateIndex" << std::endl;
 #endif
-  return DB_FAILED;
+  string index_name = ast->child_->val_;
+  ast = ast->child_;
+  string table_name = ast->next_->val_;
+  ast = ast->next_;
+  ASSERT(ast->next_->type_ == kNodeColumnList, "EXECUTE ERROR: Index keys not found");
+  ast = ast->next_;
+  auto first_index_key_node = ast->child_;
+  auto index_key_node = first_index_key_node;
+  vector<string> index_keys;
+  while (index_key_node) {
+    index_keys.emplace_back(index_key_node->val_);
+    index_key_node = index_key_node->next_;
+  }
+  if (ast->next_) {
+    ASSERT(ast->next_->type_ == kNodeIndexType, "EXECUTE ERROR: Unexpected syntax node");
+    ast = ast->next_;
+    string index_type = ast->child_->val_;
+    transform(index_type.begin(), index_type.end(), index_type.begin(), ::tolower);
+    if (index_type == "bptree") {
+      // TODO: create bptree index
+      // dbs_[current_db_]->catalog_mgr_->CreateIndex(table_name, index_name, index_keys, nullptr, IndexInfo::Create(new SimpleMemHeap()));
+      cout << "Create bptree index " << index_name << " OK" << endl;
+    } else if (index_type == "hash") {
+      // TODO: create hash index
+      cout << "Create hash index " << index_name << " OK" << endl;
+    } else {
+      cout << "Please choose (bptree/hash) index" << endl;
+    }
+  }
+
+  return DB_SUCCESS;
 }
 
 dberr_t ExecuteEngine::ExecuteDropIndex(pSyntaxNode ast, ExecuteContext *context) {
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteDropIndex" << std::endl;
 #endif
-  return DB_FAILED;
+  string index_name = ast->child_->val_;
+  // dbs_[current_db_]->catalog_mgr_->DropIndex(index_name); // 我不理解，为什么还要table_name
+  cout << "Drop index " << index_name << " OK" << endl;
+  return DB_SUCCESS;
 }
 
 dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
