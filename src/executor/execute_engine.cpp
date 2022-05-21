@@ -1,7 +1,7 @@
 #include "executor/execute_engine.h"
+#include <iomanip>
 #include "glog/logging.h"
 #include "utils/get_files.h"
-#include <iomanip>
 
 #define ENABLE_EXECUTE_DEBUG
 
@@ -16,13 +16,16 @@ ExecuteEngine::ExecuteEngine() {
   cout << "|_|  |_|_|_| |_|_|_____/ \\___\\_\\______|" << endl;
   cout << endl;
   vector<string> db_files;
+  if (!IsFileExist(path.c_str())) {
+    CreateDirectory(path.c_str());
+  }
   GetFiles(path, db_files);
   if (db_files.size() == 0) {
     cout << "no database to be loaded" << endl;
   } else {
     for (auto db_file : db_files) {
       cout << "loading " << db_file << "... ";
-      dbs_.emplace(db_file.substr(0, db_file.size()-3), new DBStorageEngine(path+db_file, false));
+      dbs_.emplace(db_file.substr(0, db_file.size() - 3), new DBStorageEngine(path + db_file, false));
       cout << "success!" << endl;
     }
   }
@@ -83,7 +86,7 @@ dberr_t ExecuteEngine::ExecuteCreateDatabase(pSyntaxNode ast, ExecuteContext *co
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteCreateDatabase" << std::endl;
 #endif
-  dbs_.emplace(ast->child_->val_, new DBStorageEngine(path+ast->child_->val_+".db"));
+  dbs_.emplace(ast->child_->val_, new DBStorageEngine(path + ast->child_->val_ + ".db"));
   cout << "Create " << ast->child_->val_ << " OK" << endl;
   return DB_SUCCESS;
 }
@@ -92,7 +95,18 @@ dberr_t ExecuteEngine::ExecuteDropDatabase(pSyntaxNode ast, ExecuteContext *cont
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteDropDatabase" << std::endl;
 #endif
-  return DB_FAILED;
+  string db_name = ast->child_->val_;
+  if (dbs_.find(db_name) == dbs_.end()) {
+    cout << "No such database called " << db_name << endl;
+    return DB_FAILED;
+  } else {
+    string path_to_db_file = path + db_name + ".db";
+    remove(path_to_db_file.c_str());
+    delete dbs_.find(db_name)->second;
+    dbs_.erase(db_name);
+    cout << "Drop " << db_name << " OK" << endl;
+    return DB_SUCCESS;
+  }
 }
 
 dberr_t ExecuteEngine::ExecuteShowDatabases(pSyntaxNode ast, ExecuteContext *context) {
@@ -105,13 +119,17 @@ dberr_t ExecuteEngine::ExecuteShowDatabases(pSyntaxNode ast, ExecuteContext *con
       max_length = (int)db.first.length();
     }
   }
-  cout << "+-" << setw(max_length) << setfill('-') << "-" << "-+" << endl;
-  cout << "| " << setw(max_length) << setfill(' ') << left << "Database" << " |" << endl;
-  cout << "+-" << setw(max_length) << setfill('-') << "-" << "-+" << endl;
+  cout << "+-" << setw(max_length) << setfill('-') << "-"
+       << "-+" << endl;
+  cout << "| " << setw(max_length) << setfill(' ') << left << "Database"
+       << " |" << endl;
+  cout << "+-" << setw(max_length) << setfill('-') << "-"
+       << "-+" << endl;
   for (auto db : dbs_) {
     cout << "| " << setw(max_length) << setfill(' ') << left << db.first << " |" << endl;
   }
-  cout << "+-" << setw(max_length) << setfill('-') << "-" << "-+" << endl;
+  cout << "+-" << setw(max_length) << setfill('-') << "-"
+       << "-+" << endl;
   return DB_SUCCESS;
 }
 
