@@ -137,7 +137,15 @@ dberr_t ExecuteEngine::ExecuteUseDatabase(pSyntaxNode ast, ExecuteContext *conte
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteUseDatabase" << std::endl;
 #endif
-  return DB_FAILED;
+  string db_name = ast->child_->val_;
+  if (dbs_.find(db_name) == dbs_.end()) {
+    cout << "No such database called " << db_name << endl;
+    return DB_FAILED;
+  } else {
+    current_db_ = db_name;
+    cout << "Use " << db_name << " OK" << endl;
+    return DB_SUCCESS;
+  }
 }
 
 dberr_t ExecuteEngine::ExecuteShowTables(pSyntaxNode ast, ExecuteContext *context) {
