@@ -142,7 +142,46 @@ void DeserializeA(char *buf, A *&a) {
 
 堆表记录迭代器是可以遍历整个heap中所有page的所有row的迭代器，通过iterator++来移动迭代器达到遍历heap的效果。
 
-![image-20220522002930501](C:\Users\夏恩博\AppData\Roaming\Typora\typora-user-images\image-20220522002930501.png)
+```cpp
+class TableHeap;
+
+class TableIterator {
+
+public:
+  // you may define your own constructor based on your member variables
+  explicit TableIterator(TableHeap * t,RowId rid);
+
+  explicit TableIterator(const TableIterator &other);
+
+  virtual ~TableIterator();
+
+  bool operator==(const TableIterator &itr) const;
+
+  bool operator!=(const TableIterator &itr) const;
+
+  const Row &operator*();
+
+  Row *operator->();
+
+  TableIterator &operator++();
+
+  TableIterator operator++(int);
+
+private:
+  // add your own private member variables here
+  TableHeap* table_heap_;
+  Row* row_;
+};
+```
+
+### TableIterator &TableIterator::operator++() 
+
+有点复杂，有以下几步
+
+1. 若当前已经是tableheap的end，则直接返回end()
+2. 先找与当前iter**同page且未被删除**的row，找不到跳到3
+3. 切换到下一个page，若当前已经是最后一页跳到4，否则跳回2
+4. 返回end()
 
 ### TableIterator TableHeap::Begin(Transaction *txn)
 
@@ -152,7 +191,11 @@ void DeserializeA(char *buf, A *&a) {
 
 用INVALID_ROWID标注end,此时rowid=(page_id,slot_id)=(-1,0)
 
-![image-20220522003230389](C:\Users\夏恩博\AppData\Roaming\Typora\typora-user-images\image-20220522003230389.png)
+```c++
+TableIterator TableHeap::End() {
+  return TableIterator(this,INVALID_ROWID);
+}
+```
 
 ### 本模块的注意事项
 
