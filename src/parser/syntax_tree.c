@@ -169,6 +169,8 @@ const char *GetSyntaxNodeTypeStr(SyntaxNodeType type) {
       return "kNodeTrxCommit";
     case kNodeTrxRollback:
       return "kNodeTrxRollback";
+    case kNodeIndexType:
+      return "kNodeIndexType";
     default:
       return "error type";
   }
