@@ -153,7 +153,15 @@ dberr_t ExecuteEngine::ExecuteShowTables(pSyntaxNode ast, ExecuteContext *contex
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteShowTables" << std::endl;
 #endif
-  return DB_FAILED;
+  std::vector<TableInfo *> tables;
+  if (dbs_[current_db_]->catalog_mgr_->GetTables(tables)) return DB_FAILED;
+  else{
+    for ( auto itr = tables.begin();  itr != tables.end(); itr++) {
+      //TODO::外围线框
+      cout << (*itr)->GetTableName() <<endl;
+    }
+  }
+  return DB_SUCCESS;
 }
 
 dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext *context) {
