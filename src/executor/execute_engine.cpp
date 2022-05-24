@@ -168,14 +168,27 @@ dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext *conte
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteCreateTable" << std::endl;
 #endif
-  return DB_FAILED;
+//  dberr_t CreateTable(const std::string &table_name, TableSchema *schema, Transaction *txn, TableInfo *&table_info);
+  string table_name = ast->child_->val_;
+  std::vector<Column *> columns;
+  TableSchema table_schema(columns);
+  Transaction *txn{};
+  TableInfo *table_info;
+  //  xjj TODO:Finish this
+  if ( dbs_[current_db_]->catalog_mgr_->CreateTable(table_name, &table_schema, txn, table_info) ) return DB_FAILED;
+  else {
+
+  }
+  return DB_SUCCESS;
 }
 
 dberr_t ExecuteEngine::ExecuteDropTable(pSyntaxNode ast, ExecuteContext *context) {
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteDropTable" << std::endl;
 #endif
-  return DB_FAILED;
+  string table_name = ast->child_->val_;
+  if (dbs_[current_db_]->catalog_mgr_->DropTable(table_name)) return DB_FAILED;
+  return DB_SUCCESS;
 }
 
 dberr_t ExecuteEngine::ExecuteShowIndexes(pSyntaxNode ast, ExecuteContext *context) {
