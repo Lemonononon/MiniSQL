@@ -93,8 +93,24 @@ private:
 
   //我严重怀疑这个函数我写的有问题，到时候可能需要重点关注一下
   Index *CreateIndex(BufferPoolManager *buffer_pool_manager) {
-    return new BPlusTreeIndex<index_id_t,IndexSchema *,BufferPoolManager*>
-        (meta_data_->GetIndexId(),key_schema_,buffer_pool_manager);
+      uint32_t keyLength = (*(key_schema_->GetColumns().begin()))->GetLength();
+      switch (keyLength) {
+        case 32:
+          return new BPlusTreeIndex<GenericKey<32>,IndexSchema *,BufferPoolManager*>
+              (meta_data_->GetIndexId(),key_schema_,buffer_pool_manager);
+          break;
+        case 64:
+          return new BPlusTreeIndex<GenericKey<64>,IndexSchema *,BufferPoolManager*>
+              (meta_data_->GetIndexId(),key_schema_,buffer_pool_manager);
+          break;
+        default:
+          //表示使用字符串作为索引
+          std::cout << "WARNING: Not prepared yet for string. From indexes.h:CreateIndex" << std::endl;
+          break;
+      }
+
+
+
   }
 
 private:
