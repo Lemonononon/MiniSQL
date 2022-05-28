@@ -249,6 +249,64 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteSelect" << std::endl;
 #endif
+  auto columns_node = ast->child_;
+  // 可能是allColumns也可能是一个columnsList
+  bool use_all_columns = true;
+  vector<string> columns;
+  if (columns_node->type_ == kNodeColumnList) {
+    use_all_columns = false;
+    auto column = columns_node->child_;
+    while (column) {
+      columns.emplace_back(column->val_);
+      column = column->next_;
+    }
+  }
+  ast = ast->next_;
+  string table_name = ast->val_;
+  vector<vector<pSyntaxNode>> conditions;
+  vector<pSyntaxNode> now_condition;
+  // 如果有查询条件
+  if (ast->next_) {
+    ast = ast->next_->child_;
+    while (ast->type_ == kNodeConnector) {
+      now_condition.emplace_back(ast->next_);
+      string connector = ast->val_;
+      if (connector == "or") {
+        conditions.emplace_back(now_condition);
+        now_condition.clear();
+      }
+    }
+    now_condition.emplace_back(ast);
+    conditions.emplace_back(now_condition);
+    now_condition.clear();
+  }
+  // 利用conditions进行查询
+  if (conditions.size() == 0) {
+    // TODO: 返回所有
+  } else {
+    bool use_index = true;
+    vector<string> index_keys;
+    // 如果有or，那么不用索引，全表扫描
+    if (conditions.size() > 1) {
+      use_index = false;
+    } else {
+      for(auto condition : conditions[0]) {
+        string condition_operator = condition->val_;
+        if (condition_operator == "<>" || condition_operator == "is" || condition_operator == "not") {
+          use_index = false;
+          break;
+        }
+      }
+      // TODO: 从catalog中获取indexes，遍历indexes，简单起见，选择匹配程度最高的索引（重合columns最多），将索引的index_keys存进index_keys。如果没有匹配的索引，use_index=false
+    }
+    if (use_index) {
+      // 单个condition
+      // TODO: 用索引进行查找
+    } else {
+      // 可能有多个condition
+      // TODO: 全表扫描
+    }
+  }
   return DB_FAILED;
 }
 
