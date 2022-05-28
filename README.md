@@ -243,3 +243,20 @@ TableIterator TableHeap::End() {
 
 ## SQL Executor
 
+### select
+
+![graphviz (2)](https://beetpic.oss-cn-hangzhou.aliyuncs.com/img/graphviz%20(2).svg)
+
+```sql
+select * from tb1 where a="A" and b="B" and c="C" or d="D";
+```
+
+<img src="https://beetpic.oss-cn-hangzhou.aliyuncs.com/img/image-20220528161514292.png" alt="image-20220528161514292" style="zoom: 25%;" />
+
+限制条件的语法树如图。
+
+注意，sql中not and or的优先级依然是not最高，and其次，or最低，也就是说每遇到一个or，这就是一个新的独立条件，需要将其保存下来（考虑放在context中）。简单起见，我采用一个while循环，从根到叶，每次读右儿子，并往左儿子移一个。如果遇到or，把or的右儿子和当前的条件（也存在context里）组合成一个完整条件，放进context，重置当前条件。遇到非逻辑词（非not and or）时，结束。
+
+然后关于索引，如果是一连串的and，我们应该先看看现有的索引中列相匹配的，然后进行代价估算，择其一。
+
+如果包含or，我们知道，即使是商业DBMS，在遇到or时索引也往往是失效的，直接不用索引。全表扫描。
