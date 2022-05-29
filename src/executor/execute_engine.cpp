@@ -251,7 +251,7 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
 #endif
   auto columns_node = ast->child_;
   // 可能是allColumns也可能是一个columnsList
-  bool use_all_columns = true;
+  [[maybe_unused]]bool use_all_columns = true;
   vector<string> columns;
   if (columns_node->type_ == kNodeColumnList) {
     use_all_columns = false;
