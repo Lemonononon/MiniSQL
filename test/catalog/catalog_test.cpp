@@ -51,8 +51,7 @@ TEST(CatalogTest, CatalogTableTest) {
   };
   auto schema = std::make_shared<Schema>(columns);
   Transaction txn;
-  dberr_t type = catalog_01->CreateTable("table-1", schema.get(), &txn, table_info);
-  cout << type << endl;
+  catalog_01->CreateTable("table-1", schema.get(), &txn, table_info);
   ASSERT_TRUE(table_info != nullptr);
   TableInfo *table_info_02 = nullptr;
   ASSERT_EQ(DB_SUCCESS, catalog_01->GetTable("table-1", table_info_02));

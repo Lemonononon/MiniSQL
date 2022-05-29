@@ -11,7 +11,7 @@ using namespace std;
  */
 void CatalogMeta::SerializeTo(char *buf) const {
   // write magic_number
-  MACH_WRITE_INT32(buf, CATALOG_METADATA_MAGIC_NUM);
+  MACH_WRITE_UINT32(buf, CATALOG_METADATA_MAGIC_NUM);
   buf += 4;
   // write table_meta_pages_.size()
   MACH_WRITE_INT32(buf, table_meta_pages_.size());
@@ -95,18 +95,21 @@ CatalogManager::CatalogManager(BufferPoolManager *buffer_pool_manager, LockManag
       heap_(new SimpleMemHeap()) {
   // step1: 实例化一个新的CatalogMeta
   catalog_meta_ = CatalogMeta::NewInstance(heap_);
-  // step2: 反序列化CatalogMetadata
-  Page *meta_data_page = buffer_pool_manager_->FetchPage(CATALOG_META_PAGE_ID);
-  meta_data_page->RLatch();
-  catalog_meta_->DeserializeFrom(meta_data_page->GetData(), heap_);
-  meta_data_page->RUnlatch();
-  // step3: 刷新CatalogManager的几个nextid
-  next_table_id_ = catalog_meta_->GetNextTableId();
-  next_index_id_ = catalog_meta_->GetNextIndexId();
-  // step4: 更新CatalogManager的数据
+
   if (init) {
-    // do nothing at now
+    // 刷新CatalogManager的几个nextid
+    next_table_id_ = catalog_meta_->GetNextTableId();
+    next_index_id_ = catalog_meta_->GetNextIndexId();
   } else {
+    // step2: 反序列化CatalogMetadata
+    Page *meta_data_page = buffer_pool_manager_->FetchPage(CATALOG_META_PAGE_ID);
+    meta_data_page->RLatch();
+    catalog_meta_->DeserializeFrom(meta_data_page->GetData(), heap_);
+    meta_data_page->RUnlatch();
+    // step3: 刷新CatalogManager的几个nextid
+    next_table_id_ = catalog_meta_->GetNextTableId();
+    next_index_id_ = catalog_meta_->GetNextIndexId();
+    // step4: 更新CatalogManager的数据
     // 根据catalogMeta中的数据更新Table和Index
     for (auto table_meta_page_it : catalog_meta_->table_meta_pages_) {
       LoadTable(table_meta_page_it.first, table_meta_page_it.second);
@@ -117,7 +120,11 @@ CatalogManager::CatalogManager(BufferPoolManager *buffer_pool_manager, LockManag
   }
 }
 
-CatalogManager::~CatalogManager() { delete heap_; }
+CatalogManager::~CatalogManager() {
+  //我不是很清楚什么时候需要Flush,以防万一，现在这里Flush一下
+  FlushCatalogMetaPage();
+  delete heap_;
+}
 
 // 新建Table,将做好的table_info返回到参数里
 dberr_t CatalogManager::CreateTable(const string &table_name, TableSchema *schema, Transaction *txn,
