@@ -96,6 +96,7 @@ CatalogManager::CatalogManager(BufferPoolManager *buffer_pool_manager, LockManag
   // 实例化一个新的CatalogMeta
   catalog_meta_ = CatalogMeta::NewInstance(heap_);
   // 首次新建数据库
+  // next_table_id等等都是从metadata那边拿过来再+1的，别忘了
   if (init) {
   } else {
   }
@@ -103,10 +104,27 @@ CatalogManager::CatalogManager(BufferPoolManager *buffer_pool_manager, LockManag
 
 CatalogManager::~CatalogManager() { delete heap_; }
 
+//新建Table,将做好的table_info返回到参数哩
 dberr_t CatalogManager::CreateTable(const string &table_name, TableSchema *schema, Transaction *txn,
                                     TableInfo *&table_info) {
-  // ASSERT(false, "Not Implemented yet");
-  return DB_FAILED;
+  // step1: 检查table是否已经存在
+  if(table_names_.find(table_name) == table_names_.end()) return DB_TABLE_ALREADY_EXIST;
+  // step2: 新建TableInfo,TableMetaData,TableHeap
+  table_info = TableInfo::Create(heap_);
+  table_id_t table_id = next_table_id_++;
+  page_id_t table_page;
+  buffer_pool_manager_->NewPage(table_page);
+  TableHeap* table_heap = TableHeap::Create(buffer_pool_manager_,
+                                            table_page,schema,log_manager_,
+                                            lock_manager_,heap_);
+  // 这里直接拿了table_heap的FirstPageId,但是这个table_heap
+  TableMetadata* meta_data = TableMetadata::Create(table_id,table_name,
+                                                   table_page,schema,heap_);
+  table_info->Init(meta_data,table_heap);
+  //step3: 更新CatalogManager
+  table_names_[table_name] = table_id;
+  tables_[table_id] = table_info;
+  return DB_SUCCESS;
 }
 
 // 通过分析应该是查找table_name，然后将其对应的table_info存到给的参数里面
@@ -163,9 +181,23 @@ dberr_t CatalogManager::GetTableIndexes(const std::string &table_name, std::vect
   return DB_SUCCESS;
 }
 
+//删除对应名字的数据库
 dberr_t CatalogManager::DropTable(const string &table_name) {
-  // ASSERT(false, "Not Implemented yet");
-  return DB_FAILED;
+    //我认为删除数据库的时候不需要回收table的table_id,因为没有重新利用的价值
+    //目前没有回收table对应的各个info,heap的内存的打算(metadata序列化的页将会回收)，仅单独从map中删除
+
+    //step1:查找是否存在table
+    auto table_id_it = table_names_.find(table_name);
+    if(table_id_it == table_names_.end()) return DB_TABLE_NOT_EXIST;
+    table_id_t table_id = table_id_it->second;
+    //step2:删除储存table的页和储存matadata的页
+    buffer_pool_manager_->DeletePage(tables_[table_id]->GetRootPageId());
+    buffer_pool_manager_->DeletePage(catalog_meta_->table_meta_pages_[table_id]);
+    //step3:删除各个map中对应的table
+    tables_.erase(tables_.find(table_id));
+    table_names_.erase(table_names_.find(table_name));
+    catalog_meta_->table_meta_pages_.erase(catalog_meta_->table_meta_pages_.find(table_id));
+    return DB_SUCCESS;
 }
 
 dberr_t CatalogManager::DropIndex(const string &table_name, const string &index_name) {
