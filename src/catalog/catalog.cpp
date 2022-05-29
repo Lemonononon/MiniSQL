@@ -123,7 +123,7 @@ CatalogManager::~CatalogManager() { delete heap_; }
 dberr_t CatalogManager::CreateTable(const string &table_name, TableSchema *schema, Transaction *txn,
                                     TableInfo *&table_info) {
   // step1: 检查table是否已经存在
-  if (table_names_.find(table_name) == table_names_.end()) return DB_TABLE_ALREADY_EXIST;
+  if (table_names_.find(table_name) != table_names_.end()) return DB_TABLE_ALREADY_EXIST;
   // step2: 新建TableInfo,TableMetaData,TableHeap
   table_info = TableInfo::Create(heap_);
   table_id_t table_id = next_table_id_++;
