@@ -93,10 +93,17 @@ CatalogManager::CatalogManager(BufferPoolManager *buffer_pool_manager, LockManag
       lock_manager_(lock_manager),
       log_manager_(log_manager),
       heap_(new SimpleMemHeap()) {
-  // 实例化一个新的CatalogMeta
+  // step1: 实例化一个新的CatalogMeta
   catalog_meta_ = CatalogMeta::NewInstance(heap_);
+  // step2: 反序列化CatalogMetadata
+  Page* meta_data_page = buffer_pool_manager_->FetchPage(CATALOG_META_PAGE_ID);
+  meta_data_page->RLatch();
+  catalog_meta_->DeserializeFrom(meta_data_page->GetData(),heap_);
+  meta_data_page->RUnlatch();
+  // step3: 刷新CatalogManager的几个nextid
+  next_table_id_ = catalog_meta_->GetNextTableId();
+  next_index_id_ = catalog_meta_->GetNextIndexId();
   // 首次新建数据库
-  // next_table_id等等都是从metadata那边拿过来再+1的，别忘了
   if (init) {
   } else {
   }
@@ -181,7 +188,7 @@ dberr_t CatalogManager::GetTableIndexes(const std::string &table_name, std::vect
   return DB_SUCCESS;
 }
 
-//删除对应名字的数据库
+//删除对应名字的table
 dberr_t CatalogManager::DropTable(const string &table_name) {
     //我认为删除数据库的时候不需要回收table的table_id,因为没有重新利用的价值
     //目前没有回收table对应的各个info,heap的内存的打算(metadata序列化的页将会回收)，仅单独从map中删除
@@ -191,8 +198,10 @@ dberr_t CatalogManager::DropTable(const string &table_name) {
     if(table_id_it == table_names_.end()) return DB_TABLE_NOT_EXIST;
     table_id_t table_id = table_id_it->second;
     //step2:删除储存table的页和储存matadata的页
-    buffer_pool_manager_->DeletePage(tables_[table_id]->GetRootPageId());
-    buffer_pool_manager_->DeletePage(catalog_meta_->table_meta_pages_[table_id]);
+    if(! buffer_pool_manager_->DeletePage(tables_[table_id]->GetRootPageId()))
+      return DB_FAILED;
+    if(! buffer_pool_manager_->DeletePage(catalog_meta_->table_meta_pages_[table_id]))
+      return DB_FAILED;
     //step3:删除各个map中对应的table
     tables_.erase(tables_.find(table_id));
     table_names_.erase(table_names_.find(table_name));
@@ -225,8 +234,10 @@ dberr_t CatalogManager::LoadTable(const table_id_t table_id, const page_id_t pag
   auto meta_data_page = buffer_pool_manager_->FetchPage(page_id);
   ASSERT(meta_data_page!=nullptr,"Fetch Tabel_meta_data_page failed!");
   //step2: 新建TableMetaData并反序列化
+  meta_data_page->RLatch();
   TableMetadata* meta_data;
   TableMetadata::DeserializeFrom(meta_data_page->GetData(),meta_data,heap_);
+  meta_data_page->RUnlatch();
   //step3: 插入table_names_
   table_names_[meta_data->GetTableName()] = table_id;
   //step4: 新建TableInfo并插入tables_
