@@ -24,7 +24,7 @@ public:
 
   inline std::string GetTableName() const { return table_name_; }
 
-  inline uint32_t GetFirstPageId() const { return root_page_id_; }
+  inline page_id_t GetFirstPageId() const { return root_page_id_; }
 
   inline Schema *GetSchema() const { return schema_; }
 

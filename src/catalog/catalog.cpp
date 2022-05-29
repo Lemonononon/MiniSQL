@@ -177,8 +177,7 @@ dberr_t CatalogManager::DropIndex(const string &table_name, const string &index_
 dberr_t CatalogManager::FlushCatalogMetaPage() const {
   // 直接序列化CatalogMetaData到数据页中
   auto catalog_meta_page = buffer_pool_manager_->FetchPage(CATALOG_META_PAGE_ID);
-  // 发生异常
-  //    if(catalog_meta_page == nullptr) return DB_FAILED;
+  ASSERT(catalog_meta_page!=nullptr,"read catalog_meta_page failed!");
   catalog_meta_page->WLatch();
   catalog_meta_->SerializeTo(catalog_meta_page->GetData());
   catalog_meta_page->WUnlatch();
@@ -188,9 +187,26 @@ dberr_t CatalogManager::FlushCatalogMetaPage() const {
   return DB_SUCCESS;
 }
 
+//读取page_id存的table_meta_data
 dberr_t CatalogManager::LoadTable(const table_id_t table_id, const page_id_t page_id) {
-  // ASSERT(false, "Not Implemented yet");
-  return DB_FAILED;
+  //step1: 拿到存meta_data的页
+  auto meta_data_page = buffer_pool_manager_->FetchPage(page_id);
+  ASSERT(meta_data_page!=nullptr,"Fetch Tabel_meta_data_page failed!");
+  //step2: 新建TableMetaData并反序列化
+  TableMetadata* meta_data;
+  TableMetadata::DeserializeFrom(meta_data_page->GetData(),meta_data,heap_);
+  //step3: 插入table_names_
+  table_names_[meta_data->GetTableName()] = table_id;
+  //step4: 新建TableInfo并插入tables_
+  TableInfo* table_info = TableInfo::Create(heap_);
+  //新建table_heap
+  TableHeap* table_heap = TableHeap::Create(buffer_pool_manager_,
+                                            meta_data->GetFirstPageId(),meta_data->GetSchema(),
+                                            log_manager_,lock_manager_,heap_);
+  table_info->Init(meta_data,table_heap);
+  tables_[table_id] = table_info;
+
+  return DB_SUCCESS;
 }
 
 dberr_t CatalogManager::LoadIndex(const index_id_t index_id, const page_id_t page_id) {
