@@ -93,20 +93,20 @@ CatalogManager::CatalogManager(BufferPoolManager *buffer_pool_manager, LockManag
       lock_manager_(lock_manager),
       log_manager_(log_manager),
       heap_(new SimpleMemHeap()) {
-  // step1: 实例化一个新的CatalogMeta
-  catalog_meta_ = CatalogMeta::NewInstance(heap_);
 
   if (init) {
+    // step1: 实例化一个新的CatalogMeta
+    catalog_meta_ = CatalogMeta::NewInstance(heap_);
     // 刷新CatalogManager的几个nextid
     next_table_id_ = catalog_meta_->GetNextTableId();
     next_index_id_ = catalog_meta_->GetNextIndexId();
   } else {
-    // step2: 反序列化CatalogMetadata
+    // step1: 反序列化CatalogMetadata
     Page *meta_data_page = buffer_pool_manager_->FetchPage(CATALOG_META_PAGE_ID);
     meta_data_page->RLatch();
-    catalog_meta_->DeserializeFrom(meta_data_page->GetData(), heap_);
+    catalog_meta_ = CatalogMeta::DeserializeFrom(meta_data_page->GetData(), heap_);
     meta_data_page->RUnlatch();
-    // step3: 刷新CatalogManager的几个nextid
+    // step2: 刷新CatalogManager的几个nextid
     next_table_id_ = catalog_meta_->GetNextTableId();
     next_index_id_ = catalog_meta_->GetNextIndexId();
     // step4: 更新CatalogManager的数据
@@ -175,7 +175,7 @@ dberr_t CatalogManager::CreateIndex(const std::string &table_name, const string 
                                     const std::vector<std::string> &index_keys, Transaction *txn,
                                     IndexInfo *&index_info) {
   // step1: 检查Table是否已经存在，Index是否已经存在
-  if (index_names_.find(table_name) == index_names_.end()) return DB_TABLE_NOT_EXIST;
+  if (table_names_.find(table_name) == table_names_.end()) return DB_TABLE_NOT_EXIST;
   if (index_names_[table_name].find(index_name) != index_names_[table_name].end()) return DB_INDEX_ALREADY_EXIST;
   // step2: 新建IndexMetaData,IndexInfo
   index_info = IndexInfo::Create(heap_);

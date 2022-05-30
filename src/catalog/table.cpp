@@ -22,9 +22,12 @@ uint32_t TableMetadata::SerializeTo(char *buf) const {
   buf += 4;
   ofs += 4;
   // 写入table_name_
+  MACH_WRITE_INT32(buf,table_name_.size());
+  buf+=4;
+  ofs+=4;
   MACH_WRITE_STRING(buf, table_name_);
-  buf += MACH_STR_SERIALIZED_SIZE(table_name_);
-  ofs += MACH_STR_SERIALIZED_SIZE(table_name_);
+  buf += table_name_.length();
+  ofs += table_name_.length();
   // 写入root_page_id_
   MACH_WRITE_INT32(buf, root_page_id_);
   buf += 4;
@@ -54,19 +57,28 @@ uint32_t TableMetadata::DeserializeFrom(char *buf, TableMetadata *&table_meta, M
   }
   buf += 4;
   ofs += 4;
-  // 写入table_id_t
+  // 读取table_id_t
   uint32_t table_id_ = MACH_READ_UINT32(buf);
   buf += 4;
   ofs += 4;
-  // 写入table_name_
-  std::string table_name_ = MACH_READ_FROM(std::string, buf);
-  buf += MACH_STR_SERIALIZED_SIZE(table_name_);
-  ofs += MACH_STR_SERIALIZED_SIZE(table_name_);
-  // 写入root_page_id_
+  // 读取table_name_
+  //先读取table_name_的长度
+  uint32_t len = MACH_READ_INT32(buf);
+  buf += 4;
+  ofs += 4;
+  // 一个字符一个字符地读取
+  char *name = new char[len];
+  ofs += len;
+  for (uint32_t i = 0; i < len; i++) {
+    name[i] = MACH_READ_FROM(char, buf);
+    buf++;
+  }
+  std::string table_name_(name);
+  // 读取root_page_id_
   int32_t root_page_id_ = MACH_READ_INT32(buf);
   buf += 4;
   ofs += 4;
-  // 写入schema
+  // 读取schema
   const TableSchema *schema_ = MACH_READ_FROM(Schema *, buf);
   buf += 8;
   ofs += 8;

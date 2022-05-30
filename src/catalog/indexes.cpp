@@ -27,9 +27,12 @@ uint32_t IndexMetadata::SerializeTo(char *buf) const {
   MACH_WRITE_UINT32(buf,index_id_);
   buf+=4;ofs+=4;
   //写入index_name_
+  MACH_WRITE_INT32(buf, index_name_.size());
+  buf+=4;
+  ofs+=4;
   MACH_WRITE_STRING(buf, index_name_);
-  buf += MACH_STR_SERIALIZED_SIZE(index_name_);
-  ofs += MACH_STR_SERIALIZED_SIZE(index_name_);
+  buf += index_name_.length();
+  ofs += index_name_.length();
   //写入table_id_t
   MACH_WRITE_UINT32(buf,table_id_);
   buf+=4;ofs+=4;
@@ -64,8 +67,17 @@ uint32_t IndexMetadata::DeserializeFrom(char *buf, IndexMetadata *&index_meta, M
   uint32_t index_id_t = MACH_READ_UINT32(buf);
   buf+=4;ofs+=4;
   //read index_name_
-  std::string index_name_ = MACH_READ_FROM(std::string,buf);
-  buf+=MACH_STR_SERIALIZED_SIZE(index_name_);ofs+=MACH_STR_SERIALIZED_SIZE(index_name_);
+  uint32_t len = MACH_READ_INT32(buf);
+  buf += 4;
+  ofs += 4;
+  // 一个字符一个字符地读取
+  char *name = new char[len];
+  ofs += len;
+  for (uint32_t i = 0; i < len; i++) {
+    name[i] = MACH_READ_FROM(char, buf);
+    buf++;
+  }
+  std::string index_name_(name);
   //read table_id_t
   uint32_t table_id_t = MACH_READ_UINT32(buf);
   buf+=4;ofs+=4;
