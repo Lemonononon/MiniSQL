@@ -63,6 +63,7 @@ uint32_t IndexMetadata::DeserializeFrom(char *buf, IndexMetadata *&index_meta, M
     cout << "ERROR: NOT INDEX_METADATA MAGIC_NUMBER!" << endl;
     return 0;
   }
+  buf+=4;ofs+=4;
   //read index_id_t
   uint32_t index_id_t = MACH_READ_UINT32(buf);
   buf+=4;ofs+=4;

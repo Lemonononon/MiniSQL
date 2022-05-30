@@ -109,13 +109,13 @@ CatalogManager::CatalogManager(BufferPoolManager *buffer_pool_manager, LockManag
     // step2: 刷新CatalogManager的几个nextid
     next_table_id_ = catalog_meta_->GetNextTableId();
     next_index_id_ = catalog_meta_->GetNextIndexId();
-    // step4: 更新CatalogManager的数据
+    // step3: 更新CatalogManager的数据
     // 根据catalogMeta中的数据更新Table和Index
     for (auto table_meta_page_it : catalog_meta_->table_meta_pages_) {
-      LoadTable(table_meta_page_it.first, table_meta_page_it.second);
+      ASSERT(LoadTable(table_meta_page_it.first, table_meta_page_it.second)==DB_SUCCESS,"LoadTable Failed!");
     }
     for (auto index_meta_page_it : catalog_meta_->index_meta_pages_) {
-      LoadIndex(index_meta_page_it.first, index_meta_page_it.second);
+      ASSERT(LoadIndex(index_meta_page_it.first, index_meta_page_it.second)==DB_SUCCESS,"LoadIndex Failed");
     }
   }
 }
@@ -193,7 +193,7 @@ dberr_t CatalogManager::CreateIndex(const std::string &table_name, const string 
   // 新建IndexMetaData并init index_info
   IndexMetadata *meta_data = IndexMetadata::Create(index_id, index_name, table_id, key_map, index_info->GetMemHeap());
   index_info->Init(meta_data, table_info, buffer_pool_manager_);
-  // step3: 更新CatalogMetaData和CalalogManager
+  // step3: 更新CatalogMetaData和CatalogManager
   // 更新index_names_
   if (index_names_.find(table_name) == index_names_.end()) {
     // index_names_里面没有该table
