@@ -130,8 +130,8 @@ private:
       [[maybe_unused]]auto *page_id = new page_id_t();
       if(index_roots->GetRootId(index_id,page_id)){
         //如果找到了index_id对应的root,说明之前已经存过了
-        auto index_page = buffer_pool_manager->FetchPage(*page_id);
-        return reinterpret_cast<Index *>(index_page->GetData());
+        auto index_page = reinterpret_cast<BPlusTreePage *>(buffer_pool_manager->FetchPage(*page_id));
+        //TODO:从拿到的BPlusTree的root_page,重新还原BPlusTree
       }
 
       uint32_t keyLength = 0;
