@@ -16,6 +16,13 @@ BPLUSTREE_TYPE::BPlusTree(index_id_t index_id, BufferPoolManager *buffer_pool_ma
       internal_max_size_(internal_max_size) {
   // 初始化为空
   root_page_id_ = INVALID_PAGE_ID;
+  auto index_roots_page = buffer_pool_manager->FetchPage(INDEX_ROOTS_PAGE_ID);
+  auto index_roots = reinterpret_cast<IndexRootsPage*>(index_roots_page->GetData());
+  page_id_t* root_page_id_receiver = new page_id_t();
+  if (index_roots->GetRootId(index_id, root_page_id_receiver)) {
+    root_page_id_ = *root_page_id_receiver;
+  }
+  delete root_page_id_receiver;
 }
 
 INDEX_TEMPLATE_ARGUMENTS
