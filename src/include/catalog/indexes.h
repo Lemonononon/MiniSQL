@@ -116,6 +116,7 @@ private:
   explicit IndexInfo() : meta_data_{nullptr}, index_{nullptr}, table_info_{nullptr},
                          key_schema_{nullptr}, heap_(new SimpleMemHeap()) {}
 
+  //直接根据key的Length新建index,index会自动从磁盘中读取对应index_id的数据
   Index *CreateIndex(BufferPoolManager *buffer_pool_manager) {
       uint32_t keyLength = 0;
       for(auto column_it : key_schema_->GetColumns()){
