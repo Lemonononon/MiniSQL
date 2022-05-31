@@ -116,24 +116,7 @@ private:
   explicit IndexInfo() : meta_data_{nullptr}, index_{nullptr}, table_info_{nullptr},
                          key_schema_{nullptr}, heap_(new SimpleMemHeap()) {}
 
-  //我严重怀疑这个函数我写的有问题，到时候可能需要重点关注一下
-  //感觉对于KeyLength的大小有点问题
   Index *CreateIndex(BufferPoolManager *buffer_pool_manager) {
-      // 要先判断Index_id是否已经存在了，如果已经存在了的话就直接从读出来
-      index_id_t index_id = meta_data_->GetIndexId();
-
-      auto index_roots_page = buffer_pool_manager->FetchPage(INDEX_ROOTS_PAGE_ID);
-      if (index_roots_page == nullptr) {
-        throw Exception("out of memory");
-      }
-      auto index_roots = reinterpret_cast<IndexRootsPage *>(index_roots_page->GetData());
-      [[maybe_unused]]auto *page_id = new page_id_t();
-      if(index_roots->GetRootId(index_id,page_id)){
-        //如果找到了index_id对应的root,说明之前已经存过了
-        auto index_page = reinterpret_cast<BPlusTreePage *>(buffer_pool_manager->FetchPage(*page_id));
-        //TODO:从拿到的BPlusTree的root_page,重新还原BPlusTree
-      }
-
       uint32_t keyLength = 0;
       for(auto column_it : key_schema_->GetColumns()){
         keyLength += column_it->GetLength();
