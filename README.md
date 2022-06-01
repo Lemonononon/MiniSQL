@@ -239,6 +239,56 @@ TableIterator TableHeap::End() {
 
 ## Catalog Manager
 
+Catalog Manager这个模块的核心要义就是完成```CatalogManager```类，该类将作为Part5 Executor与前面三个part的桥梁使用。
+
+### 结构示意
+
+**CatalogManager**
+
+- CatalogMetaData
+  - Index_meta_data_page(used to reload catalog)
+  - table_meta_data_page(used to reload catalog)
+- many kinds of maps
+  - IndexInfo
+    - index_meta_data
+    - index
+    - TableInfo ( of this index )
+    - others
+  - TableInfo
+    - table_meta_data
+    - TableHeap
+    - others
+- Others
+
+### 序列化与反序列化
+
+在该模块，我们需要序列化的只有各个模块的元信息，即```CatalogMetaData```,```TableMetaDada```,```IndexMetaData```。该序列化和反序列化过程与Part2非常相似，不再赘述。
+
+### 新建Catalog时的处理
+
+无论是新建数据库还是重新读取数据库，都需要新建Catalog，而在CatalogManager的构造函数中有一个参数为```init```，其代表了这次新建catalog是新建一个空白catalog还是从磁盘中恢复之前持久化的catalog。
+
+恢复持久化的catalog就需要从磁盘中恢复之前刷盘的index和table。CatalogMetaData可以通过解析bpm中**CATALOG_META_PAGE_ID**所对应的数据页来获得，而其他的元信息都可以通过之前序列化的```TableMetaDada```和```IndexMetaData```来重现。其中table的数据会通过传入table自身的**root_page_id**来重新获得；index的数据将会由传入的index自身对应的**index_id**来重新获得。
+
+### 为上层模块提供的操作方式
+
+详情见于```catalog.h```，对于每个函数的作用和执行方式，已有足够详细的代码注释，不再赘述。
+
+### FlushCatalogMetaPage()函数的作用
+
+该函数将会立刻把目前CatalogMetaData写入对应数据页，并且根据助教的建议，将会即刻刷盘。
+
+### 有关next_table_id以及next_index_id的处理
+
+该部分参考[fix CatalogMeta::GetNextTableId & CatalogMeta::GetNextIndexId (!1) · Merge requests · zjucsdb / MiniSQL · GitLab](https://git.zju.edu.cn/zjucsdb/minisql/-/merge_requests/1)修改了框架。
+
+### 有关CatalogManager中，几个存放index和table信息的map的处理
+
+有关table的map的处理非常简单，主要的问题是有关index的map的处理。由于在某一个table上可能没有index，也可能有多个index，因此在做任何有关index的map的更新操作时，都需要进行详细地分类讨论，保证**index_names_中不存在其中任何一个table没有index的情况**，虽然这种ASSERT会增加操作的成本，但是会使得代码的可维护性大大提升。
+
+### 内存分配
+
+各个块的内存都需要从其上层的heap_分配，如```IndexMetaData```的内存空间就需要从```IndexInfo```的内存空间分配，而每个```IndexInfo```的内存空间都需要从```CatalogManager```分配，这样可以确保在上层的内存被回收时，下层的内存会被自动回收。
 
 
 ## SQL Executor

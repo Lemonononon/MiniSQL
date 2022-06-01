@@ -289,6 +289,7 @@ dberr_t CatalogManager::DropTable(const string &table_name) {
   return DB_SUCCESS;
 }
 
+//根据参数删除对应的index
 dberr_t CatalogManager::DropIndex(const string &table_name, const string &index_name) {
   // 同DropTable,目前并没有回收index_id以及info占用的内存的打算
   // step1: 查找是否存在table 以及 index
