@@ -221,12 +221,14 @@ dberr_t ExecuteEngine::ExecuteCreateIndex(pSyntaxNode ast, ExecuteContext *conte
     string index_type = ast->child_->val_;
     transform(index_type.begin(), index_type.end(), index_type.begin(), ::tolower);
     if (index_type == "bptree") {
-      // TODO: create bptree index
-      // dbs_[current_db_]->catalog_mgr_->CreateIndex(table_name, index_name, index_keys, nullptr, IndexInfo::Create(new SimpleMemHeap()));
+      // TODO: 这里目前并没有index的type入参，默认只有bplustree
+      IndexInfo* tmp_index_info;
+       dbs_[current_db_]->catalog_mgr_->CreateIndex(table_name, index_name, index_keys, nullptr, tmp_index_info);
       cout << "Create bptree index " << index_name << " OK" << endl;
     } else if (index_type == "hash") {
       // TODO: create hash index
-      cout << "Create hash index " << index_name << " OK" << endl;
+      cout << "Not supported yet" << endl;
+      // cout << "Create hash index " << index_name << " OK" << endl;
     } else {
       cout << "Please choose (bptree/hash) index" << endl;
     }
@@ -283,6 +285,7 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
   // 利用conditions进行查询
   if (conditions.size() == 0) {
     // TODO: 返回所有
+
   } else {
     bool use_index = true;
     vector<string> index_keys;
