@@ -287,27 +287,88 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
     // TODO: 返回所有
 
   } else {
+    // 是否使用索引
     bool use_index = true;
-    vector<string> index_keys;
+    IndexInfo* chosed_index = nullptr;
+    // 是否使用复合索引
+    bool use_multi_index = true;
+    bool is_all_equal = true;
     // 如果有or，那么不用索引，全表扫描
     if (conditions.size() > 1) {
       use_index = false;
     } else {
+      // 此时只有一个全为and连接的条件集合，位于conditions[0]
       for(auto condition : conditions[0]) {
         string condition_operator = condition->val_;
+        if (condition_operator != "=") {
+          is_all_equal = false;
+        }
         if (condition_operator == "<>" || condition_operator == "is" || condition_operator == "not") {
           use_index = false;
           break;
         }
       }
-      // TODO: 从catalog中获取indexes，遍历indexes，简单起见，选择匹配程度最高的索引（重合columns最多），将索引的index_keys存进index_keys。如果没有匹配的索引，use_index=false
+      vector<IndexInfo *> indexes;
+      dbs_[current_db_]->catalog_mgr_->GetTableIndexes(table_name, indexes);
+      // 简单起见，这里只做（所有索引字段条件为等于）的复合索引查询或简单单列索引的索引查询）
+      // 先判断有没有必要做复合索引查询
+      if (is_all_equal && conditions[0].size() > 1) {
+        // 如果可以做复合索引查询，那么找找有没有完全匹配的复合索引
+        for (auto index : indexes) {
+          auto tmp_columns = index->GetIndexKeySchema()->GetColumns();
+          bool all_same = true;
+          if (tmp_columns.size() != conditions[0].size()) {
+            all_same = false;
+          } else {
+            for (auto condition : conditions[0]) {
+              bool single_same = false;
+              for (auto tmp_column : tmp_columns) {
+                if (tmp_column->GetName() == condition->child_->val_) {
+                  single_same = true;
+                  break;
+                }
+              }
+              if (!single_same) {
+                all_same = false;
+                break;
+              }
+            }
+          }
+          if (all_same) {
+            chosed_index = index;
+            break;
+          }
+        }
+        if (chosed_index == nullptr) {
+          use_multi_index = false;
+        }
+      }
+      if (!use_multi_index) {
+        // 寻找单个索引
+        for (auto index : indexes) {
+          auto tmp_columns = index->GetIndexKeySchema()->GetColumns();
+          if (tmp_columns.size() > 1) {
+            continue;
+          } else {
+            for (auto condition : conditions[0]) {
+              // 找到第一个符合的就行，不过多计算优化
+              if (condition->child_->val_ == tmp_columns[0]->GetName()) {
+                chosed_index = index;
+                break;
+              }
+            }
+          }
+        }
+      }
     }
-    if (use_index) {
+    if (use_index && chosed_index != nullptr) {
       // 单个condition
       // TODO: 用索引进行查找
+      //einterpret_cast<BPlusTreeIndex*>(chosed_index->GetIndex());
     } else {
       // 可能有多个condition
       // TODO: 全表扫描
+
     }
   }
   return DB_FAILED;
