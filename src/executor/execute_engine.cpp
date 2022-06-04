@@ -282,10 +282,17 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
     conditions.emplace_back(now_condition);
     now_condition.clear();
   }
-  // 利用conditions进行查询
-  if (conditions.size() == 0) {
-    // TODO: 返回所有
+  // TODO: 对table_name，conditions中的列名，columns中的列名做合法性判断
 
+  // 利用conditions进行查询
+  vector<RowId> result;
+  if (conditions.size() == 0) {
+    TableInfo* tmp_table_info;
+    dbs_[current_db_]->catalog_mgr_->GetTable(table_name, tmp_table_info);
+    auto table_iter = tmp_table_info->GetTableHeap()->Begin(nullptr);
+    while (table_iter != tmp_table_info->GetTableHeap()->End()) {
+      result.emplace_back((*table_iter).GetRowId());
+    }
   } else {
     // 是否使用索引
     bool use_index = true;
@@ -363,13 +370,65 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
     }
     if (use_index && chosed_index != nullptr) {
       // 单个condition
-      // TODO: 用索引进行查找
-      //einterpret_cast<BPlusTreeIndex*>(chosed_index->GetIndex());
-    } else {
-      // 可能有多个condition
-      // TODO: 全表扫描
+      // 用索引进行查找
+      // int key_length = chosed_index->GetKeyLength();
+      // 先构建一个索引查找的Row对象
+      vector<Field> fields;
+      for (auto column : chosed_index->GetIndexKeySchema()->GetColumns()) {
+        for (auto condition : conditions[0]) {
+          if (condition->child_->val_ == column->GetName()) {
+            if (column->GetType() == TypeId::kTypeInt) {
+              fields.emplace_back(Field(column->GetType(), stoi(condition->child_->next_->val_)));
+            } else if (column->GetType() == TypeId::kTypeChar) {
+              string tmp_str = condition->child_->next_->val_;
+              fields.emplace_back(Field(column->GetType(), condition->child_->next_->val_, tmp_str.size(), true));
+            } else if (column->GetType() == TypeId::kTypeFloat) {
+              fields.emplace_back(Field(column->GetType(), (float)atof(condition->child_->next_->val_)));
+            }
+          }
+        }
+      }
+      Row row(fields);
+      if (use_multi_index) {
+        if (chosed_index->GetIndex()->ScanKey(row, result, nullptr, "=") == DB_KEY_NOT_FOUND) {
+          cout << "empty set" << endl;
+          return DB_SUCCESS;
+        }
+      } else {
+        // 用单个列的索引
+        for (auto condition : conditions[0]) {
+          if (condition->child_->val_ == chosed_index->GetIndexKeySchema()->GetColumn(0)->GetName()) {
+            if (chosed_index->GetIndex()->ScanKey(row, result, nullptr, condition->val_) == DB_KEY_NOT_FOUND) {
+              cout << "empty set" << endl;
+              return DB_SUCCESS;
+            } else {
+              // TODO：因为单个列的索引查找我是允许有复合条件的，所以还把result过滤一遍
 
+            }
+          }
+        }
+      }
+    } else {
+      // 可能有多个condition（指or相连的）
+      // TODO: 全表扫描，符合的加进result
+      TableInfo* tmp_table_info;
+      dbs_[current_db_]->catalog_mgr_->GetTable(table_name, tmp_table_info);
+      auto tmp_table_iter = tmp_table_info->GetTableHeap()->Begin(nullptr);
+      while (tmp_table_iter != tmp_table_info->GetTableHeap()->End()) {
+        bool is_satisfied = true;
+        // TODO: 遍历条件
+
+        if (is_satisfied) {
+          result.emplace_back((*tmp_table_iter).GetRowId());
+        }
+      }
     }
+  }
+  if (result.size() == 0) {
+    cout << "empty set" << endl;
+    return DB_SUCCESS;
+  } else {
+    // TODO: 打印result（记得根据columns投影）
   }
   return DB_FAILED;
 }
