@@ -109,6 +109,8 @@ class IndexInfo {
 
   inline TableInfo *GetTableInfo() const { return table_info_; }
 
+  inline int32_t GetKeyLength() const { return meta_data_->keyLength; }
+
  private:
   explicit IndexInfo()
       : meta_data_{nullptr}, index_{nullptr}, table_info_{nullptr}, key_schema_{nullptr}, heap_(new SimpleMemHeap()) {}
