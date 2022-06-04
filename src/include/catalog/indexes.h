@@ -4,7 +4,6 @@
 #include <memory>
 
 #include "catalog/table.h"
-#include "index/generic_key.h"
 #include "index/b_plus_tree_index.h"
 #include "index/generic_key.h"
 #include "page/index_roots_page.h"
@@ -14,10 +13,9 @@
 class IndexMetadata {
   friend class IndexInfo;
 
-public:
-  static IndexMetadata *Create(const index_id_t index_id, const std::string &index_name,
-                               const table_id_t table_id, const std::vector<uint32_t> &key_map,
-                               MemHeap *heap);
+ public:
+  static IndexMetadata *Create(const index_id_t index_id, const std::string &index_name, const table_id_t table_id,
+                               const std::vector<uint32_t> &key_map, MemHeap *heap);
 
   uint32_t SerializeTo(char *buf) const;
 
@@ -35,38 +33,37 @@ public:
 
   inline index_id_t GetIndexId() const { return index_id_; }
 
-private:
+ private:
   IndexMetadata() = delete;
 
-  explicit IndexMetadata(const index_id_t index_id, const std::string &index_name,
-                         const table_id_t table_id, const std::vector<uint32_t> &key_map) {
+  explicit IndexMetadata(const index_id_t index_id, const std::string &index_name, const table_id_t table_id,
+                         const std::vector<uint32_t> &key_map) {
     index_id_ = index_id;
     index_name_ = index_name;
     table_id_ = table_id;
     key_map_ = key_map;
   }
 
-private:
+ private:
   static constexpr uint32_t INDEX_METADATA_MAGIC_NUM = 344528;
   index_id_t index_id_;
   std::string index_name_;
   table_id_t table_id_;
-  std::vector<uint32_t> key_map_;  /** The mapping of index key to tuple key */
+  int32_t keyLength;  //keyLength的值是在CreateIndex里面赋值的，构造index_meta_data的时候没有必要给值
+  std::vector<uint32_t> key_map_; /** The mapping of index key to tuple key */
 };
 
 /**
  * The IndexInfo class maintains metadata about a index.
  */
 class IndexInfo {
-public:
+ public:
   static IndexInfo *Create(MemHeap *heap) {
     void *buf = heap->Allocate(sizeof(IndexInfo));
-    return new(buf)IndexInfo();
+    return new (buf) IndexInfo();
   }
 
-  ~IndexInfo() {
-    delete heap_;
-  }
+  ~IndexInfo() { delete heap_; }
 
   void Init(IndexMetadata *meta_data, TableInfo *table_info, BufferPoolManager *buffer_pool_manager) {
     // Step1: init index metadata and table info
@@ -75,31 +72,31 @@ public:
     // Step2: mapping index key to key schema
     vector<uint32_t> column_index;
     // 将metadata中的key_schema(即需要作为索引的Key)push到到column_index中
-    for(auto & key_index : meta_data->GetKeyMapping()){
+    for (auto &key_index : meta_data->GetKeyMapping()) {
       column_index.push_back(key_index);
     }
-    key_schema_ = Schema::ShallowCopySchema(table_info_->GetSchema(),column_index,heap_);
+    key_schema_ = Schema::ShallowCopySchema(table_info_->GetSchema(), column_index, heap_);
     // Step3: call CreateIndex to create the index
     index_ = CreateIndex(buffer_pool_manager);
 
-    //我想了想，这块暂时不应该存在。如果是重新读取Index的话，那就会导致在原有的Index上重新InsertEntry
-    //或许有关这一块的处理得加载CatalogManager::CreateIndex那里
-    //目前的状态就是：索引必须在table刚创建的时候创建，不然table中原有的数据不会纳入索引
-    //把整个table InsertEntry
-//    TableHeap* table_heap = table_info->GetTableHeap();
-//    //如果table不为空的话，我们需要InsertEntry
-//    if(table_heap->Begin(nullptr) != table_heap->End()){
-//      for(auto table_it = table_heap->Begin(nullptr); table_it != table_heap->End(); table_it++){
-//        //制作一个只包括key的row
-//        std::vector<Field> fields;
-//        for(auto i : meta_data->GetKeyMapping()){
-//          fields.push_back(*(table_it->GetField(i)));
-//        }
-//        Row row(fields);
-//        index_->InsertEntry(row,table_it->GetRowId(),nullptr);
-//      }
-//
-//    }
+    // 我想了想，这块暂时不应该存在。如果是重新读取Index的话，那就会导致在原有的Index上重新InsertEntry
+    // 或许有关这一块的处理得加载CatalogManager::CreateIndex那里
+    // 目前的状态就是：索引必须在table刚创建的时候创建，不然table中原有的数据不会纳入索引
+    // 把整个table InsertEntry
+    //    TableHeap* table_heap = table_info->GetTableHeap();
+    //    //如果table不为空的话，我们需要InsertEntry
+    //    if(table_heap->Begin(nullptr) != table_heap->End()){
+    //      for(auto table_it = table_heap->Begin(nullptr); table_it != table_heap->End(); table_it++){
+    //        //制作一个只包括key的row
+    //        std::vector<Field> fields;
+    //        for(auto i : meta_data->GetKeyMapping()){
+    //          fields.push_back(*(table_it->GetField(i)));
+    //        }
+    //        Row row(fields);
+    //        index_->InsertEntry(row,table_it->GetRowId(),nullptr);
+    //      }
+    //
+    //    }
   }
 
   inline Index *GetIndex() { return index_; }
@@ -112,39 +109,45 @@ public:
 
   inline TableInfo *GetTableInfo() const { return table_info_; }
 
-private:
-  explicit IndexInfo() : meta_data_{nullptr}, index_{nullptr}, table_info_{nullptr},
-                         key_schema_{nullptr}, heap_(new SimpleMemHeap()) {}
+ private:
+  explicit IndexInfo()
+      : meta_data_{nullptr}, index_{nullptr}, table_info_{nullptr}, key_schema_{nullptr}, heap_(new SimpleMemHeap()) {}
 
-  //直接根据key的Length新建index,index会自动从磁盘中读取对应index_id的数据
+  // 直接根据key的Length新建index,index会自动从磁盘中读取对应index_id的数据
   Index *CreateIndex(BufferPoolManager *buffer_pool_manager) {
-      uint32_t keyLength = 0;
-      for(auto column_it : key_schema_->GetColumns()){
-        keyLength += column_it->GetLength();
-      }
-      ASSERT(keyLength <= 128, "WARNING: GenericKey is not big enough. From indexes.h:CreateIndex");
-      if(keyLength <= 4)
-        return new BPlusTreeIndex<GenericKey<4>, RowId, GenericComparator<4>>
-            (meta_data_->GetIndexId(),key_schema_,buffer_pool_manager);
-      else if(keyLength <= 8)
-        return new BPlusTreeIndex<GenericKey<8>, RowId, GenericComparator<8>>
-            (meta_data_->GetIndexId(),key_schema_,buffer_pool_manager);
-      else if(keyLength <= 16)
-          return new BPlusTreeIndex<GenericKey<16>, RowId, GenericComparator<16>>
-            (meta_data_->GetIndexId(),key_schema_,buffer_pool_manager);
-      else if(keyLength <= 32)
-          return new BPlusTreeIndex<GenericKey<32>, RowId, GenericComparator<32>>
-            (meta_data_->GetIndexId(),key_schema_,buffer_pool_manager);
-      else if(keyLength <= 64)
-        return new BPlusTreeIndex<GenericKey<64>, RowId, GenericComparator<64>>
-            (meta_data_->GetIndexId(),key_schema_,buffer_pool_manager);
-      else
-        return new BPlusTreeIndex<GenericKey<64>, RowId, GenericComparator<64>>
-            (meta_data_->GetIndexId(),key_schema_,buffer_pool_manager);
-
+    uint32_t keyLength = 0;
+    for (auto column_it : key_schema_->GetColumns()) {
+      keyLength += column_it->GetLength();
+    }
+    ASSERT(keyLength <= 128, "WARNING: GenericKey is not big enough. From indexes.h:CreateIndex");
+    if (keyLength <= 4) {
+      meta_data_->keyLength = 4;
+      return new BPlusTreeIndex<GenericKey<4>, RowId, GenericComparator<4>>
+          (meta_data_->GetIndexId(), key_schema_,buffer_pool_manager);
+    } else if (keyLength <= 8) {
+      meta_data_->keyLength = 8;
+      return new BPlusTreeIndex<GenericKey<8>, RowId, GenericComparator<8>>
+          (meta_data_->GetIndexId(), key_schema_,buffer_pool_manager);
+    } else if (keyLength <= 16) {
+      meta_data_->keyLength = 16;
+      return new BPlusTreeIndex<GenericKey<16>, RowId, GenericComparator<16>>
+          (meta_data_->GetIndexId(), key_schema_,buffer_pool_manager);
+    } else if (keyLength <= 32) {
+      meta_data_->keyLength = 32;
+      return new BPlusTreeIndex<GenericKey<32>, RowId, GenericComparator<32>>
+          (meta_data_->GetIndexId(), key_schema_,buffer_pool_manager);
+    } else if (keyLength <= 64) {
+      meta_data_->keyLength = 64;
+      return new BPlusTreeIndex<GenericKey<64>, RowId, GenericComparator<64>>
+          (meta_data_->GetIndexId(), key_schema_,buffer_pool_manager);
+    } else {
+      meta_data_->keyLength = 64;
+      return new BPlusTreeIndex<GenericKey<64>, RowId, GenericComparator<64>>
+          (meta_data_->GetIndexId(), key_schema_,buffer_pool_manager);
+    }
   }
 
-private:
+ private:
   IndexMetadata *meta_data_;
   Index *index_;
   TableInfo *table_info_;
@@ -152,4 +155,4 @@ private:
   MemHeap *heap_;
 };
 
-#endif //MINISQL_INDEXES_H
+#endif  // MINISQL_INDEXES_H

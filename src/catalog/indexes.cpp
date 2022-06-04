@@ -1,5 +1,6 @@
 #include "catalog/indexes.h"
 
+//keyLength的值是在CreateIndex里面赋值的，构造index_meta_data的时候没有必要给值
 IndexMetadata *IndexMetadata::Create(const index_id_t index_id, const string &index_name,
                                      const table_id_t table_id, const vector<uint32_t> &key_map,
                                      MemHeap *heap) {
@@ -14,8 +15,9 @@ IndexMetadata *IndexMetadata::Create(const index_id_t index_id, const string &in
  * 2.index_id_
  * 3.index_name_
  * 4.table_id_
- * 5.key_map_.size()
- * 6.key_map_
+ * 5.keyLength
+ * 6.key_map_.size()
+ * 7.key_map_
  */
 uint32_t IndexMetadata::SerializeTo(char *buf) const {
   //记录偏移量
@@ -36,6 +38,9 @@ uint32_t IndexMetadata::SerializeTo(char *buf) const {
   //写入table_id_t
   MACH_WRITE_UINT32(buf,table_id_);
   buf+=4;ofs+=4;
+  //写入keyLength
+  MACH_WRITE_INT32(buf,keyLength);
+  buf+=4;ofs+=4;
   //写入key_map_size()
   MACH_WRITE_INT32(buf,key_map_.size());
   buf+=4;ofs+=4;
@@ -51,8 +56,8 @@ uint32_t IndexMetadata::SerializeTo(char *buf) const {
 
 uint32_t IndexMetadata::GetSerializedSize() const {
   //magic_num(4)+index_id_t(4)+index_name_(MACH_STR_SERIALIZED_SIZE(index_name_))+
-  // table_id_t(4)+key_map_size(4)+4*key_map_size
-  return 16+MACH_STR_SERIALIZED_SIZE(index_name_)+4*key_map_.size();
+  // table_id_t(4)+keyLength(4)+key_map_size(4)+4*key_map_size
+  return 20+MACH_STR_SERIALIZED_SIZE(index_name_)+4*key_map_.size();
 }
 
 uint32_t IndexMetadata::DeserializeFrom(char *buf, IndexMetadata *&index_meta, MemHeap *heap) {
@@ -82,6 +87,9 @@ uint32_t IndexMetadata::DeserializeFrom(char *buf, IndexMetadata *&index_meta, M
   //read table_id_t
   uint32_t table_id_t = MACH_READ_UINT32(buf);
   buf+=4;ofs+=4;
+  //read keyLength
+  int32_t keyLength = MACH_READ_INT32(buf);
+  buf+=4;ofs+=4;
   //read key_map_size()
   int32_t key_map_size = MACH_READ_INT32(buf);
   buf+=4;ofs+=4;
@@ -95,5 +103,7 @@ uint32_t IndexMetadata::DeserializeFrom(char *buf, IndexMetadata *&index_meta, M
   }
   //调用create函数,将反序列化得到的数据填到heap
   index_meta = IndexMetadata::Create(index_id_t,index_name_,table_id_t,key_map_,heap);
+  //直接在这里加，不需要修改构造函数。因为keyLength的值是在CreateIndex里面赋值的，构造index_meta_data的时候没有必要给值
+  index_meta->keyLength = keyLength;
   return ofs;
 }
