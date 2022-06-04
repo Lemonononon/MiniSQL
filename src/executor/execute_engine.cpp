@@ -224,7 +224,24 @@ dberr_t ExecuteEngine::ExecuteCreateIndex(pSyntaxNode ast, ExecuteContext *conte
     if (index_type == "bptree") {
       // TODO: 这里目前并没有index的type入参，默认只有bplustree
       IndexInfo* tmp_index_info;
-       dbs_[current_db_]->catalog_mgr_->CreateIndex(table_name, index_name, index_keys, nullptr, tmp_index_info);
+      dbs_[current_db_]->catalog_mgr_->CreateIndex(table_name, index_name, index_keys, nullptr, tmp_index_info);
+      TableInfo* tmp_table_info;
+      dbs_[current_db_]->catalog_mgr_->GetTable(table_name, tmp_table_info);
+      uint32_t* column_index = new uint32_t [index_keys.size()];
+      for (unsigned long i = 0; i < index_keys.size(); ++i) {
+        tmp_table_info->GetSchema()->GetColumnIndex(index_keys[i], column_index[i]);
+      }
+      auto table_iter = tmp_table_info->GetTableHeap()->Begin(nullptr);
+      for (;table_iter != tmp_table_info->GetTableHeap()->End();++table_iter) {
+        // 遍历整个表，对每一行都取出响应Index keys插入索引
+        vector<Field> fields;
+        for (unsigned long i = 0; i < index_keys.size(); ++i) {
+          fields.emplace_back(*(table_iter->GetField(column_index[i])));
+        }
+        Row tmp_row(fields);
+        tmp_index_info->GetIndex()->InsertEntry(tmp_row, table_iter->GetRowId(), nullptr);
+      }
+      delete[] column_index;
       cout << "Create bptree index " << index_name << " OK" << endl;
     } else if (index_type == "hash") {
       // TODO: create hash index
@@ -602,7 +619,7 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
     return DB_SUCCESS;
   } else {
     // TODO: 打印result（记得根据columns投影）
-    
+
   }
   return DB_FAILED;
 }
