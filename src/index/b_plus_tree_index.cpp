@@ -34,13 +34,41 @@ dberr_t BPLUSTREE_INDEX_TYPE::RemoveEntry(const Row &key, RowId row_id, Transact
 }
 
 INDEX_TEMPLATE_ARGUMENTS
-dberr_t BPLUSTREE_INDEX_TYPE::ScanKey(const Row &key, vector<RowId> &result, Transaction *txn) {
+dberr_t BPLUSTREE_INDEX_TYPE::ScanKey(const Row &key, vector<RowId> &result, Transaction *txn, string condition) {
   KeyType index_key;
   index_key.SerializeFromKey(key, key_schema_);
-  if (container_.GetValue(index_key, result, txn)) {
-    return DB_SUCCESS;
+  if (condition.size() == 0 || condition == "=") {
+    if (container_.GetValue(index_key, result, txn)) {
+      return DB_SUCCESS;
+    }
+    return DB_KEY_NOT_FOUND;
+  } else if (condition == ">") {
+    auto iter = GetBeginIterator(index_key);
+    ++iter;
+    while (iter != GetEndIterator()) {
+      result.emplace_back((*iter).second);
+      ++iter;
+    }
+  } else if (condition == ">=") {
+    auto iter = GetBeginIterator(index_key);
+    while (iter != GetEndIterator()) {
+      result.emplace_back((*iter).second);
+      ++iter;
+    }
+  } else if (condition == "<") {
+    auto iter = GetBeginIterator();
+    while (iter != GetEndIterator() && comparator_((*iter).first, index_key) < 0) {
+      result.emplace_back((*iter).second);
+      ++iter;
+    }
+  } else if (condition == "<=") {
+    auto iter = GetBeginIterator();
+    while (iter != GetEndIterator() && comparator_((*iter).first, index_key) <= 0) {
+      result.emplace_back((*iter).second);
+      ++iter;
+    }
   }
-  return DB_KEY_NOT_FOUND;
+  return DB_SUCCESS;
 }
 
 INDEX_TEMPLATE_ARGUMENTS
