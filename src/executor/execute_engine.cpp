@@ -7,6 +7,7 @@
 
 #define ENABLE_EXECUTE_DEBUG
 
+bool IsSatisfiedRow(Row* row, SyntaxNode* condition, uint32_t column_index, TypeId column_type);
 string path = "./db/";
 
 ExecuteEngine::ExecuteEngine() {
@@ -224,7 +225,24 @@ dberr_t ExecuteEngine::ExecuteCreateIndex(pSyntaxNode ast, ExecuteContext *conte
     if (index_type == "bptree") {
       // TODO: 这里目前并没有index的type入参，默认只有bplustree
       IndexInfo* tmp_index_info;
-       dbs_[current_db_]->catalog_mgr_->CreateIndex(table_name, index_name, index_keys, nullptr, tmp_index_info);
+      dbs_[current_db_]->catalog_mgr_->CreateIndex(table_name, index_name, index_keys, nullptr, tmp_index_info);
+      TableInfo* tmp_table_info;
+      dbs_[current_db_]->catalog_mgr_->GetTable(table_name, tmp_table_info);
+      uint32_t* column_index = new uint32_t [index_keys.size()];
+      for (unsigned long i = 0; i < index_keys.size(); ++i) {
+        tmp_table_info->GetSchema()->GetColumnIndex(index_keys[i], column_index[i]);
+      }
+      auto table_iter = tmp_table_info->GetTableHeap()->Begin(nullptr);
+      for (;table_iter != tmp_table_info->GetTableHeap()->End();++table_iter) {
+        // 遍历整个表，对每一行都取出响应Index keys插入索引
+        vector<Field> fields;
+        for (unsigned long i = 0; i < index_keys.size(); ++i) {
+          fields.emplace_back(*(table_iter->GetField(column_index[i])));
+        }
+        Row tmp_row(fields);
+        tmp_index_info->GetIndex()->InsertEntry(tmp_row, table_iter->GetRowId(), nullptr);
+      }
+      delete[] column_index;
       cout << "Create bptree index " << index_name << " OK" << endl;
     } else if (index_type == "hash") {
       // TODO: create hash index
@@ -286,13 +304,14 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
   // TODO: 对table_name，conditions中的列名，columns中的列名做合法性判断
 
   // 利用conditions进行查询
+  TableInfo* table_info;
+  dbs_[current_db_]->catalog_mgr_->GetTable(table_name, table_info);
   vector<RowId> result;
   if (conditions.size() == 0) {
-    TableInfo* tmp_table_info;
-    dbs_[current_db_]->catalog_mgr_->GetTable(table_name, tmp_table_info);
-    auto table_iter = tmp_table_info->GetTableHeap()->Begin(nullptr);
-    while (table_iter != tmp_table_info->GetTableHeap()->End()) {
+    auto table_iter = table_info->GetTableHeap()->Begin(nullptr);
+    while (table_iter != table_info->GetTableHeap()->End()) {
       result.emplace_back((*table_iter).GetRowId());
+      ++table_iter;
     }
   } else {
     // 是否使用索引
@@ -403,25 +422,196 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
               cout << "empty set" << endl;
               return DB_SUCCESS;
             } else {
-              // TODO：因为单个列的索引查找我是允许有复合条件的，所以还把result过滤一遍
-
+              // 因为单个列的索引查找我是允许有复合条件的，所以还把result过滤一遍
+              for (auto item= result.begin();item != result.end();) {
+                Row tmp_row(*item);
+                table_info->GetTableHeap()->GetTuple(&tmp_row, nullptr);
+                // 这里是遍历conditions[0]的第二层，外面那层是为了找到索引列，里面这层是对索引列条件选出来的结果做其他条件的筛选
+                bool is_item_satisfied = true;
+                for (auto tmp_condition : conditions[0]) {
+                  uint32_t column_index;
+                  table_info->GetSchema()->GetColumnIndex(tmp_condition->child_->val_, column_index);
+                  auto column_type = table_info->GetSchema()->GetColumn(column_index)->GetType();
+                  if (!IsSatisfiedRow(&tmp_row, tmp_condition, column_index, column_type)) {
+                    is_item_satisfied = false;
+                    break;
+                  }
+                }
+                if (!is_item_satisfied) {
+                  result.erase(item);
+                } else {
+                  item++;
+                }
+              }
             }
+            break;
           }
         }
       }
     } else {
       // 可能有多个condition（指or相连的）
-      // TODO: 全表扫描，符合的加进result
-      TableInfo* tmp_table_info;
-      dbs_[current_db_]->catalog_mgr_->GetTable(table_name, tmp_table_info);
-      auto tmp_table_iter = tmp_table_info->GetTableHeap()->Begin(nullptr);
-      while (tmp_table_iter != tmp_table_info->GetTableHeap()->End()) {
-        bool is_satisfied = true;
-        // TODO: 遍历条件
-
+      // 全表扫描，符合的加进result
+      auto tmp_table_iter = table_info->GetTableHeap()->Begin(nullptr);
+      while (tmp_table_iter != table_info->GetTableHeap()->End()) {
+        bool is_satisfied = false;
+        // 遍历条件
+        for (auto divided_conditions : conditions) {
+          bool is_single_satisfied = true;
+          // 这是一坨and连接的条件，只要有一个挂了就整个挂
+          for (auto condition : divided_conditions) {
+            string condition_operator = condition->val_;
+            // 获取这个condition对应的column序号，才能在field里取值
+            uint32_t column_index;
+            table_info->GetSchema()->GetColumnIndex(condition->child_->val_, column_index);
+            auto column_type = table_info->GetSchema()->GetColumn(column_index)->GetType();
+            if (condition_operator == "=") {
+              if (column_type == TypeId::kTypeInt) {
+                auto tmp_field = Field(column_type, stoi(condition->child_->next_->val_));
+                if (tmp_table_iter->GetField(column_index)->CompareEquals(tmp_field) == CmpBool::kFalse) {
+                  is_single_satisfied = false;
+                  break;
+                }
+              } else if (column_type == TypeId::kTypeChar) {
+                string tmp_str = condition->child_->next_->val_;
+                auto tmp_field = Field(column_type, condition->child_->next_->val_, tmp_str.size(), true);
+                if (tmp_table_iter->GetField(column_index)->CompareEquals(tmp_field) == CmpBool::kFalse) {
+                  is_single_satisfied = false;
+                  break;
+                }
+              } else if (column_type == TypeId::kTypeFloat) {
+                auto tmp_field = Field(column_type, (float)atof(condition->child_->next_->val_));
+                if (tmp_table_iter->GetField(column_index)->CompareEquals(tmp_field) == CmpBool::kFalse) {
+                  is_single_satisfied = false;
+                  break;
+                }
+              }
+            } else if (condition_operator == "<") {
+              if (column_type == TypeId::kTypeInt) {
+                auto tmp_field = Field(column_type, stoi(condition->child_->next_->val_));
+                if (tmp_table_iter->GetField(column_index)->CompareLessThan(tmp_field) == CmpBool::kFalse) {
+                  is_single_satisfied = false;
+                  break;
+                }
+              } else if (column_type == TypeId::kTypeChar) {
+                string tmp_str = condition->child_->next_->val_;
+                auto tmp_field = Field(column_type, condition->child_->next_->val_, tmp_str.size(), true);
+                if (tmp_table_iter->GetField(column_index)->CompareLessThan(tmp_field) == CmpBool::kFalse) {
+                  is_single_satisfied = false;
+                  break;
+                }
+              } else if (column_type == TypeId::kTypeFloat) {
+                auto tmp_field = Field(column_type, (float)atof(condition->child_->next_->val_));
+                if (tmp_table_iter->GetField(column_index)->CompareLessThan(tmp_field) == CmpBool::kFalse) {
+                  is_single_satisfied = false;
+                  break;
+                }
+              }
+            } else if (condition_operator == "<=") {
+              if (column_type == TypeId::kTypeInt) {
+                auto tmp_field = Field(column_type, stoi(condition->child_->next_->val_));
+                if (tmp_table_iter->GetField(column_index)->CompareLessThanEquals(tmp_field) == CmpBool::kFalse) {
+                  is_single_satisfied = false;
+                  break;
+                }
+              } else if (column_type == TypeId::kTypeChar) {
+                string tmp_str = condition->child_->next_->val_;
+                auto tmp_field = Field(column_type, condition->child_->next_->val_, tmp_str.size(), true);
+                if (tmp_table_iter->GetField(column_index)->CompareLessThanEquals(tmp_field) == CmpBool::kFalse) {
+                  is_single_satisfied = false;
+                  break;
+                }
+              } else if (column_type == TypeId::kTypeFloat) {
+                auto tmp_field = Field(column_type, (float)atof(condition->child_->next_->val_));
+                if (tmp_table_iter->GetField(column_index)->CompareLessThanEquals(tmp_field) == CmpBool::kFalse) {
+                  is_single_satisfied = false;
+                  break;
+                }
+              }
+            } else if (condition_operator == ">") {
+              if (column_type == TypeId::kTypeInt) {
+                auto tmp_field = Field(column_type, stoi(condition->child_->next_->val_));
+                if (tmp_table_iter->GetField(column_index)->CompareGreaterThan(tmp_field) == CmpBool::kFalse) {
+                  is_single_satisfied = false;
+                  break;
+                }
+              } else if (column_type == TypeId::kTypeChar) {
+                string tmp_str = condition->child_->next_->val_;
+                auto tmp_field = Field(column_type, condition->child_->next_->val_, tmp_str.size(), true);
+                if (tmp_table_iter->GetField(column_index)->CompareGreaterThan(tmp_field) == CmpBool::kFalse) {
+                  is_single_satisfied = false;
+                  break;
+                }
+              } else if (column_type == TypeId::kTypeFloat) {
+                auto tmp_field = Field(column_type, (float)atof(condition->child_->next_->val_));
+                if (tmp_table_iter->GetField(column_index)->CompareGreaterThan(tmp_field) == CmpBool::kFalse) {
+                  is_single_satisfied = false;
+                  break;
+                }
+              }
+            } else if (condition_operator == ">=") {
+              if (column_type == TypeId::kTypeInt) {
+                auto tmp_field = Field(column_type, stoi(condition->child_->next_->val_));
+                if (tmp_table_iter->GetField(column_index)->CompareGreaterThanEquals(tmp_field) == CmpBool::kFalse) {
+                  is_single_satisfied = false;
+                  break;
+                }
+              } else if (column_type == TypeId::kTypeChar) {
+                string tmp_str = condition->child_->next_->val_;
+                auto tmp_field = Field(column_type, condition->child_->next_->val_, tmp_str.size(), true);
+                if (tmp_table_iter->GetField(column_index)->CompareGreaterThanEquals(tmp_field) == CmpBool::kFalse) {
+                  is_single_satisfied = false;
+                  break;
+                }
+              } else if (column_type == TypeId::kTypeFloat) {
+                auto tmp_field = Field(column_type, (float)atof(condition->child_->next_->val_));
+                if (tmp_table_iter->GetField(column_index)->CompareGreaterThanEquals(tmp_field) == CmpBool::kFalse) {
+                  is_single_satisfied = false;
+                  break;
+                }
+              }
+            } else if (condition_operator == "<>") {
+              if (column_type == TypeId::kTypeInt) {
+                auto tmp_field = Field(column_type, stoi(condition->child_->next_->val_));
+                if (tmp_table_iter->GetField(column_index)->CompareNotEquals(tmp_field) == CmpBool::kFalse) {
+                  is_single_satisfied = false;
+                  break;
+                }
+              } else if (column_type == TypeId::kTypeChar) {
+                string tmp_str = condition->child_->next_->val_;
+                auto tmp_field = Field(column_type, condition->child_->next_->val_, tmp_str.size(), true);
+                if (tmp_table_iter->GetField(column_index)->CompareNotEquals(tmp_field) == CmpBool::kFalse) {
+                  is_single_satisfied = false;
+                  break;
+                }
+              } else if (column_type == TypeId::kTypeFloat) {
+                auto tmp_field = Field(column_type, (float)atof(condition->child_->next_->val_));
+                if (tmp_table_iter->GetField(column_index)->CompareNotEquals(tmp_field) == CmpBool::kFalse) {
+                  is_single_satisfied = false;
+                  break;
+                }
+              }
+            } else if (condition_operator == "is") {
+              if (!tmp_table_iter->GetField(column_index)->IsNull()) {
+                is_single_satisfied = false;
+                break;
+              }
+            } else if (condition_operator == "not") {
+              if (tmp_table_iter->GetField(column_index)->IsNull()) {
+                is_single_satisfied = false;
+                break;
+              }
+            }
+          }
+          if (is_single_satisfied) {
+            // 在一堆or中，只要有一个满足即可
+            is_satisfied = true;
+            break;
+          }
+        }
         if (is_satisfied) {
           result.emplace_back((*tmp_table_iter).GetRowId());
         }
+        ++tmp_table_iter;
       }
     }
   }
@@ -430,6 +620,7 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
     return DB_SUCCESS;
   } else {
     // TODO: 打印result（记得根据columns投影）
+
   }
   return DB_FAILED;
 }
@@ -526,4 +717,128 @@ dberr_t ExecuteEngine::ExecuteQuit(pSyntaxNode ast, ExecuteContext *context) {
   ASSERT(ast->type_ == kNodeQuit, "Unexpected node type.");
   context->flag_quit_ = true;
   return DB_SUCCESS;
+}
+
+// 判断Row对象是否满足condition，condition中涉及到的column在row中为第column_index个
+bool IsSatisfiedRow(Row* row, SyntaxNode* condition, uint32_t column_index, TypeId column_type) {
+  bool is_satisfied = true;
+  string condition_operator = condition->val_;
+  if (condition_operator == "=") {
+    if (column_type == TypeId::kTypeInt) {
+      auto tmp_field = Field(column_type, stoi(condition->child_->next_->val_));
+      if (row->GetField(column_index)->CompareEquals(tmp_field) == CmpBool::kFalse) {
+        is_satisfied = false;
+      }
+    } else if (column_type == TypeId::kTypeChar) {
+      string tmp_str = condition->child_->next_->val_;
+      auto tmp_field = Field(column_type, condition->child_->next_->val_, tmp_str.size(), true);
+      if (row->GetField(column_index)->CompareEquals(tmp_field) == CmpBool::kFalse) {
+        is_satisfied = false;
+      }
+    } else if (column_type == TypeId::kTypeFloat) {
+      auto tmp_field = Field(column_type, (float)atof(condition->child_->next_->val_));
+      if (row->GetField(column_index)->CompareEquals(tmp_field) == CmpBool::kFalse) {
+        is_satisfied = false;
+      }
+    }
+  } else if (condition_operator == "<") {
+    if (column_type == TypeId::kTypeInt) {
+      auto tmp_field = Field(column_type, stoi(condition->child_->next_->val_));
+      if (row->GetField(column_index)->CompareLessThan(tmp_field) == CmpBool::kFalse) {
+        is_satisfied = false;
+      }
+    } else if (column_type == TypeId::kTypeChar) {
+      string tmp_str = condition->child_->next_->val_;
+      auto tmp_field = Field(column_type, condition->child_->next_->val_, tmp_str.size(), true);
+      if (row->GetField(column_index)->CompareLessThan(tmp_field) == CmpBool::kFalse) {
+        is_satisfied = false;
+      }
+    } else if (column_type == TypeId::kTypeFloat) {
+      auto tmp_field = Field(column_type, (float)atof(condition->child_->next_->val_));
+      if (row->GetField(column_index)->CompareLessThan(tmp_field) == CmpBool::kFalse) {
+        is_satisfied = false;
+      }
+    }
+  } else if (condition_operator == "<=") {
+    if (column_type == TypeId::kTypeInt) {
+      auto tmp_field = Field(column_type, stoi(condition->child_->next_->val_));
+      if (row->GetField(column_index)->CompareLessThanEquals(tmp_field) == CmpBool::kFalse) {
+        is_satisfied = false;
+      }
+    } else if (column_type == TypeId::kTypeChar) {
+      string tmp_str = condition->child_->next_->val_;
+      auto tmp_field = Field(column_type, condition->child_->next_->val_, tmp_str.size(), true);
+      if (row->GetField(column_index)->CompareLessThanEquals(tmp_field) == CmpBool::kFalse) {
+        is_satisfied = false;
+      }
+    } else if (column_type == TypeId::kTypeFloat) {
+      auto tmp_field = Field(column_type, (float)atof(condition->child_->next_->val_));
+      if (row->GetField(column_index)->CompareLessThanEquals(tmp_field) == CmpBool::kFalse) {
+        is_satisfied = false;
+      }
+    }
+  } else if (condition_operator == ">") {
+    if (column_type == TypeId::kTypeInt) {
+      auto tmp_field = Field(column_type, stoi(condition->child_->next_->val_));
+      if (row->GetField(column_index)->CompareGreaterThan(tmp_field) == CmpBool::kFalse) {
+        is_satisfied = false;
+      }
+    } else if (column_type == TypeId::kTypeChar) {
+      string tmp_str = condition->child_->next_->val_;
+      auto tmp_field = Field(column_type, condition->child_->next_->val_, tmp_str.size(), true);
+      if (row->GetField(column_index)->CompareGreaterThan(tmp_field) == CmpBool::kFalse) {
+        is_satisfied = false;
+      }
+    } else if (column_type == TypeId::kTypeFloat) {
+      auto tmp_field = Field(column_type, (float)atof(condition->child_->next_->val_));
+      if (row->GetField(column_index)->CompareGreaterThan(tmp_field) == CmpBool::kFalse) {
+        is_satisfied = false;
+      }
+    }
+  } else if (condition_operator == ">=") {
+    if (column_type == TypeId::kTypeInt) {
+      auto tmp_field = Field(column_type, stoi(condition->child_->next_->val_));
+      if (row->GetField(column_index)->CompareGreaterThanEquals(tmp_field) == CmpBool::kFalse) {
+        is_satisfied = false;
+      }
+    } else if (column_type == TypeId::kTypeChar) {
+      string tmp_str = condition->child_->next_->val_;
+      auto tmp_field = Field(column_type, condition->child_->next_->val_, tmp_str.size(), true);
+      if (row->GetField(column_index)->CompareGreaterThanEquals(tmp_field) == CmpBool::kFalse) {
+        is_satisfied = false;
+      }
+    } else if (column_type == TypeId::kTypeFloat) {
+      auto tmp_field = Field(column_type, (float)atof(condition->child_->next_->val_));
+      if (row->GetField(column_index)->CompareGreaterThanEquals(tmp_field) == CmpBool::kFalse) {
+        is_satisfied = false;
+      }
+    }
+  } else if (condition_operator == "<>") {
+    if (column_type == TypeId::kTypeInt) {
+      auto tmp_field = Field(column_type, stoi(condition->child_->next_->val_));
+      if (row->GetField(column_index)->CompareNotEquals(tmp_field) == CmpBool::kFalse) {
+        is_satisfied = false;
+      }
+    } else if (column_type == TypeId::kTypeChar) {
+      string tmp_str = condition->child_->next_->val_;
+      auto tmp_field = Field(column_type, condition->child_->next_->val_, tmp_str.size(), true);
+      if (row->GetField(column_index)->CompareNotEquals(tmp_field) == CmpBool::kFalse) {
+        is_satisfied = false;
+      }
+    } else if (column_type == TypeId::kTypeFloat) {
+      auto tmp_field = Field(column_type, (float)atof(condition->child_->next_->val_));
+      if (row->GetField(column_index)->CompareNotEquals(tmp_field) == CmpBool::kFalse) {
+        is_satisfied = false;
+      }
+    }
+  } else if (condition_operator == "is") {
+    if (!row->GetField(column_index)->IsNull()) {
+      is_satisfied = false;
+    }
+  } else if (condition_operator == "not") {
+    if (row->GetField(column_index)->IsNull()) {
+      is_satisfied = false;
+    }
+  }
+  return is_satisfied;
 }
