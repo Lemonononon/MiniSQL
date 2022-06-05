@@ -173,14 +173,58 @@ dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext *conte
 //  dberr_t CreateTable(const std::string &table_name, TableSchema *schema, Transaction *txn, TableInfo *&table_info);
   string table_name = ast->child_->val_;
   std::vector<Column *> columns;
+  //根据语法树建立所有的column
+  auto node = ast->child_->next_->child_;
+  uint32_t column_index = 0;
+
+  //记录所有的column对象，后续需要所有column对象的指针来创建TableSchema
+  vector<Column> columns_list;
+  while(node){
+    //column默认是可以为空，不unique的
+    bool flag_nullable = true;
+    bool flag_unique = false;
+    //primary key, unique 等约束条件
+    string constraint;
+    if (node->val_) {
+      constraint = node->val_;
+      flag_nullable = false;
+      flag_unique = true;
+      //如果是unique，只需要将Column中的unique_置为true
+      //如果是primary key，则需要额外的操作 TODO: 需要什么操作？
+
+    }
+    string column_name = node->child_->val_;
+    string column_type = node->child_->next_->val_;
+    uint32_t length;
+//    Column column_list = new Column*[];
+    Column* a[10];
+    //int, float, char
+    if ( column_type == "char"){
+      uint32_t column_length =  atoi(node->child_->next_->child_->val_);
+      Column column(column_name, kTypeChar, column_length, flag_nullable, flag_unique);
+      columns_list.emplace_back(column);
+    }else if ( column_type == "int"){
+      Column column(column_name, kTypeInt, column_index++, flag_nullable, flag_unique);
+      columns_list.emplace_back(&column);
+    }else if ( column_type == "float" ){
+      Column column(column_name, kTypeFloat, column_index++, flag_nullable, flag_unique);
+      columns_list.emplace_back(&column);
+    }
+    node = node->next_;
+  }
+  for (auto itr = columns_list.begin(); itr != columns_list.end(); ++itr) {
+    columns.emplace_back(&(*itr));
+  }
+  //根据columns创建TableSchema
   TableSchema table_schema(columns);
-  Transaction *txn{};
+//  Transaction *txn{};
   TableInfo *table_info;
   //  xjj TODO:Finish this
-  if ( dbs_[current_db_]->catalog_mgr_->CreateTable(table_name, &table_schema, txn, table_info) ) return DB_FAILED;
-  else {
-
-  }
+  dbs_[current_db_]->catalog_mgr_->CreateTable(table_name, &table_schema, nullptr, table_info);
+//  if ( dbs_[current_db_]->catalog_mgr_->CreateTable(table_name, &table_schema, nullptr, table_info) ) return DB_FAILED;
+//  else {
+//
+//  }
   return DB_SUCCESS;
 }
 
@@ -638,7 +682,6 @@ dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext *context) {
 
   vector<Field> fields;
   auto columns = table_info->GetSchema()->GetColumns();
-  uint32_t* field_type = new uint32_t [columns.size()];
 
   //第一个value
   auto val_node = ast->child_->next_->child_;
@@ -664,7 +707,6 @@ dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext *context) {
   Row row(fields);
   //插入数据
   table_info->GetTableHeap()->InsertTuple( row, nullptr);
-  delete[] field_type;
   return DB_SUCCESS;
 }
 
