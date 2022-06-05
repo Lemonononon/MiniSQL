@@ -3,6 +3,7 @@
 #include <iomanip>
 #include "glog/logging.h"
 #include "utils/get_files.h"
+#include <cstring>
 
 #define ENABLE_EXECUTE_DEBUG
 
@@ -437,7 +438,43 @@ dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext *context) {
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteInsert" << std::endl;
 #endif
-  return DB_FAILED;
+  string table_name = ast->child_->val_;
+  TableInfo* table_info;
+  dberr_t get_table_result;
+  get_table_result = dbs_[current_db_]->catalog_mgr_->GetTable(table_name, table_info);
+  //获取TableInfo失败，返回状态
+  if (get_table_result != DB_SUCCESS) return get_table_result;
+
+  vector<Field> fields;
+  auto columns = table_info->GetSchema()->GetColumns();
+  uint32_t* field_type = new uint32_t [columns.size()];
+
+  //第一个value
+  auto val_node = ast->child_->next_->child_;
+
+  //遍历以获取每个field的类型，如果语法树value的结点不够，则报错
+  for ( auto itr = columns.begin(); itr != columns.end()  ; itr++) {
+    //node为空，则insert的数据有错
+    if (!val_node) {
+      cout << "wrong insert format!" << endl;
+      return DB_FAILED;
+    }
+    uint32_t type = (*itr)->GetType();
+    //int
+    if ( type == kTypeInt ) fields.emplace_back( Field(kTypeInt, static_cast<int>(*val_node->val_)));
+    //float
+    else if (type==kTypeFloat) fields.emplace_back( Field(kTypeFloat, static_cast<float>(*val_node->val_) ) );
+    //char
+    else fields.emplace_back( Field(kTypeChar, val_node->val_, strlen(val_node->val_), true) );
+    val_node = val_node->next_;
+  }
+  //  int field_type = table_info->GetSchema()->GetColumn()->GetType()
+
+  Row row(fields);
+  //插入数据
+  table_info->GetTableHeap()->InsertTuple( row, nullptr);
+  delete[] field_type;
+  return DB_SUCCESS;
 }
 
 dberr_t ExecuteEngine::ExecuteDelete(pSyntaxNode ast, ExecuteContext *context) {
