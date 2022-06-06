@@ -32,6 +32,7 @@ void InputCommand(char *input, const int len) {
 }
 
 int main(int argc, char **argv) {
+  //TODO: 创建.db的副本避免crash
   InitGoogleLog(argv[0]);
   // command buffer
   const int buf_size = 1024;

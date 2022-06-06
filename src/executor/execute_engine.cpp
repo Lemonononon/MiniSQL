@@ -3,6 +3,7 @@
 #include <iomanip>
 #include "glog/logging.h"
 #include "utils/get_files.h"
+#include <cstring>
 
 #define ENABLE_EXECUTE_DEBUG
 
@@ -172,14 +173,58 @@ dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext *conte
 //  dberr_t CreateTable(const std::string &table_name, TableSchema *schema, Transaction *txn, TableInfo *&table_info);
   string table_name = ast->child_->val_;
   std::vector<Column *> columns;
+  //根据语法树建立所有的column
+  auto node = ast->child_->next_->child_;
+  uint32_t column_index = 0;
+
+  //记录所有的column对象，后续需要所有column对象的指针来创建TableSchema
+  vector<Column> columns_list;
+  while(node){
+    //column默认是可以为空，不unique的
+    bool flag_nullable = true;
+    bool flag_unique = false;
+    //primary key, unique 等约束条件
+    string constraint;
+    if (node->val_) {
+      constraint = node->val_;
+      flag_nullable = false;
+      flag_unique = true;
+      //如果是unique，只需要将Column中的unique_置为true
+      //如果是primary key，则需要额外的操作 TODO: 需要什么操作？
+
+    }
+    string column_name = node->child_->val_;
+    string column_type = node->child_->next_->val_;
+    uint32_t length;
+//    Column column_list = new Column*[];
+    Column* a[10];
+    //int, float, char
+    if ( column_type == "char"){
+      uint32_t column_length =  atoi(node->child_->next_->child_->val_);
+      Column column(column_name, kTypeChar, column_length, flag_nullable, flag_unique);
+      columns_list.emplace_back(column);
+    }else if ( column_type == "int"){
+      Column column(column_name, kTypeInt, column_index++, flag_nullable, flag_unique);
+      columns_list.emplace_back(&column);
+    }else if ( column_type == "float" ){
+      Column column(column_name, kTypeFloat, column_index++, flag_nullable, flag_unique);
+      columns_list.emplace_back(&column);
+    }
+    node = node->next_;
+  }
+  for (auto itr = columns_list.begin(); itr != columns_list.end(); ++itr) {
+    columns.emplace_back(&(*itr));
+  }
+  //根据columns创建TableSchema
   TableSchema table_schema(columns);
-  Transaction *txn{};
+//  Transaction *txn{};
   TableInfo *table_info;
   //  xjj TODO:Finish this
-  if ( dbs_[current_db_]->catalog_mgr_->CreateTable(table_name, &table_schema, txn, table_info) ) return DB_FAILED;
-  else {
-
-  }
+  dbs_[current_db_]->catalog_mgr_->CreateTable(table_name, &table_schema, nullptr, table_info);
+//  if ( dbs_[current_db_]->catalog_mgr_->CreateTable(table_name, &table_schema, nullptr, table_info) ) return DB_FAILED;
+//  else {
+//
+//  }
   return DB_SUCCESS;
 }
 
@@ -655,7 +700,41 @@ dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext *context) {
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteInsert" << std::endl;
 #endif
-  return DB_FAILED;
+  string table_name = ast->child_->val_;
+  TableInfo* table_info;
+  dberr_t get_table_result;
+  get_table_result = dbs_[current_db_]->catalog_mgr_->GetTable(table_name, table_info);
+  //获取TableInfo失败，返回状态
+  if (get_table_result != DB_SUCCESS) return get_table_result;
+
+  vector<Field> fields;
+  auto columns = table_info->GetSchema()->GetColumns();
+
+  //第一个value
+  auto val_node = ast->child_->next_->child_;
+
+  //遍历以获取每个field的类型，如果语法树value的结点不够，则报错
+  for ( auto itr = columns.begin(); itr != columns.end()  ; itr++) {
+    //node为空，则insert的数据有错
+    if (!val_node) {
+      cout << "wrong insert format!" << endl;
+      return DB_FAILED;
+    }
+    uint32_t type = (*itr)->GetType();
+    //int
+    if ( type == kTypeInt ) fields.emplace_back( Field(kTypeInt, static_cast<int>(*val_node->val_)));
+    //float
+    else if (type==kTypeFloat) fields.emplace_back( Field(kTypeFloat, static_cast<float>(*val_node->val_) ) );
+    //char
+    else fields.emplace_back( Field(kTypeChar, val_node->val_, strlen(val_node->val_), true) );
+    val_node = val_node->next_;
+  }
+  //  int field_type = table_info->GetSchema()->GetColumn()->GetType()
+
+  Row row(fields);
+  //插入数据
+  table_info->GetTableHeap()->InsertTuple( row, nullptr);
+  return DB_SUCCESS;
 }
 
 dberr_t ExecuteEngine::ExecuteDelete(pSyntaxNode ast, ExecuteContext *context) {
@@ -669,7 +748,10 @@ dberr_t ExecuteEngine::ExecuteUpdate(pSyntaxNode ast, ExecuteContext *context) {
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteUpdate" << std::endl;
 #endif
-  return DB_FAILED;
+  //TODO: xjj, finish this
+
+
+  return DB_SUCCESS;
 }
 
 dberr_t ExecuteEngine::ExecuteTrxBegin(pSyntaxNode ast, ExecuteContext *context) {
