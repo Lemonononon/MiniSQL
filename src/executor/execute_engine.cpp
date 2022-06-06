@@ -618,8 +618,35 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
     cout << "empty set" << endl;
     return DB_SUCCESS;
   } else {
-    // TODO: 打印result（记得根据columns投影）
-
+    // 打印result
+    vector<Row> result_rows;
+    // 需要知道要取哪些field的值，（投影操作），所以需要先得到这些field的index，也就是column_indexes
+    vector<uint32_t> column_indexes;
+    for (unsigned long i=0;i<result.size();i++) {
+      auto tmp_row = Row(result[i]);
+      table_info->GetTableHeap()->GetTuple(&tmp_row, nullptr);
+      result_rows.emplace_back(tmp_row);
+    }
+    if (use_all_columns) {
+      for (auto column : table_info->GetSchema()->GetColumns()) {
+        columns.emplace_back(column->GetName());
+      }
+    }
+    for (auto column : columns) {
+      uint32_t column_index;
+      table_info->GetSchema()->GetColumnIndex(column, column_index);
+      column_indexes.emplace_back(column_index);
+    }
+    // TODO: 打印result_rows中的column_indexes处的field值，需要找出最长值，最后格式化打印
+    int* print_length = new int[columns.size()];
+    for (auto result_row : result_rows) {
+      for (auto column_index : column_indexes) {
+        // TODO: 从Field中还原出值
+        // result_row.GetField(column_index).
+        // 如果长度长于print_length[i]，那么更新print_length
+      }
+    }
+    delete[] print_length;
   }
   return DB_FAILED;
 }
