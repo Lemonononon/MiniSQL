@@ -330,3 +330,27 @@ ScanKey(const Row &key, vector<RowId> &result, Transaction *txn, string conditio
 新的ScanKey需要传入一个condition，为“”或者“=”时仅在result返回完全符合的一个结果，为“>=”、“<=”、“>”、“<”时会返回满足条件的所有结果。
 
 +++
+
+### 一些包装的函数和思路
+
+#### bool IsSatisfiedRow(Row *row, SyntaxNode *condition, uint32_t column_index, TypeId column_type);
+
+返回一个Row对象是否满足这一个condition，其中column_index是这个condition在表中是哪一个字段（那个字段的index），column_type是这个condition的类型，可以在TableInfo之类的地方用column_index找到。那么什么是一个condition？
+
+![image-20220606225733915](https://beetpic.oss-cn-hangzhou.aliyuncs.com/img/image-20220606225733915.png)
+
+![image-20220606225755357](https://beetpic.oss-cn-hangzhou.aliyuncs.com/img/image-20220606225755357.png)
+
+一个这样的语法子树，我们称它为一个condition。其中d是字段名，"D"是值。
+
+#### string GetFieldString(Field *field, TypeId type);
+
+一个简单的函数，返回这个Field的值转换成的字符串。需要传入这个Field的type。在打印的时候，这个函数非常有用。
+
+#### vector\<RowId\> GetSatisfiedRowIds(vector<vector<SyntaxNode*>> conditions, TableInfo* table_info, vector<IndexInfo *> indexes);
+
+一个很复杂的函数，返回这个table中满足conditions的所有RowId。传入的参数中，table_info和indexes很容易理解，都可以在catalog manager中获取。
+
+conditions，为什么是一个双重vector？这个地方我实在想不出命名了，可能应该是conditions再加一个s才对（。考虑支持的逻辑运算符and和or。一旦有or的存在，那么只需要满足被or切割开的“由and相连的条件们”中的任意一项即可。比如a>1 and b<2 or c>3 or d<4，显然为了好好判断，我们需要把a>1 and b<2分为第一块，c>3分为第二块，d<4分为第三块。而conditions中保存的就是[[a>1, b<2], [c>3], [d<4]]。
+
+你可以参照select中的方式把语法树解析成conditions。
