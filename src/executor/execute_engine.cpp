@@ -1,13 +1,14 @@
 #include "executor/execute_engine.h"
 #include <algorithm>
+#include <cstring>
 #include <iomanip>
 #include "glog/logging.h"
 #include "utils/get_files.h"
-#include <cstring>
 
 #define ENABLE_EXECUTE_DEBUG
 
-bool IsSatisfiedRow(Row* row, SyntaxNode* condition, uint32_t column_index, TypeId column_type);
+bool IsSatisfiedRow(Row *row, SyntaxNode *condition, uint32_t column_index, TypeId column_type);
+string GetFieldString(Field *field, TypeId type);
 string path = "./db/";
 
 ExecuteEngine::ExecuteEngine() {
@@ -156,11 +157,12 @@ dberr_t ExecuteEngine::ExecuteShowTables(pSyntaxNode ast, ExecuteContext *contex
   LOG(INFO) << "ExecuteShowTables" << std::endl;
 #endif
   std::vector<TableInfo *> tables;
-  if (dbs_[current_db_]->catalog_mgr_->GetTables(tables)) return DB_FAILED;
-  else{
-    for ( auto itr = tables.begin();  itr != tables.end(); itr++) {
-      //TODO::外围线框
-      cout << (*itr)->GetTableName() <<endl;
+  if (dbs_[current_db_]->catalog_mgr_->GetTables(tables))
+    return DB_FAILED;
+  else {
+    for (auto itr = tables.begin(); itr != tables.end(); itr++) {
+      // TODO::外围线框
+      cout << (*itr)->GetTableName() << endl;
     }
   }
   return DB_SUCCESS;
@@ -170,43 +172,42 @@ dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext *conte
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteCreateTable" << std::endl;
 #endif
-//  dberr_t CreateTable(const std::string &table_name, TableSchema *schema, Transaction *txn, TableInfo *&table_info);
+  //  dberr_t CreateTable(const std::string &table_name, TableSchema *schema, Transaction *txn, TableInfo *&table_info);
   string table_name = ast->child_->val_;
   std::vector<Column *> columns;
-  //根据语法树建立所有的column
+  // 根据语法树建立所有的column
   auto node = ast->child_->next_->child_;
   uint32_t column_index = 0;
 
-  //记录所有的column对象，后续需要所有column对象的指针来创建TableSchema
+  // 记录所有的column对象，后续需要所有column对象的指针来创建TableSchema
   vector<Column> columns_list;
-  while(node){
-    //column默认是可以为空，不unique的
+  while (node) {
+    // column默认是可以为空，不unique的
     bool flag_nullable = true;
     bool flag_unique = false;
-    //primary key, unique 等约束条件
+    // primary key, unique 等约束条件
     string constraint;
     if (node->val_) {
       constraint = node->val_;
       flag_nullable = false;
       flag_unique = true;
-      //如果是unique，只需要将Column中的unique_置为true
-      //如果是primary key，则需要额外的操作 TODO: 需要什么操作？
-
+      // 如果是unique，只需要将Column中的unique_置为true
+      // 如果是primary key，则需要额外的操作 TODO: 需要什么操作？
     }
     string column_name = node->child_->val_;
     string column_type = node->child_->next_->val_;
     uint32_t length;
-//    Column column_list = new Column*[];
-    Column* a[10];
-    //int, float, char
-    if ( column_type == "char"){
-      uint32_t column_length =  atoi(node->child_->next_->child_->val_);
+    //    Column column_list = new Column*[];
+    Column *a[10];
+    // int, float, char
+    if (column_type == "char") {
+      uint32_t column_length = atoi(node->child_->next_->child_->val_);
       Column column(column_name, kTypeChar, column_length, flag_nullable, flag_unique);
       columns_list.emplace_back(column);
-    }else if ( column_type == "int"){
+    } else if (column_type == "int") {
       Column column(column_name, kTypeInt, column_index++, flag_nullable, flag_unique);
       columns_list.emplace_back(&column);
-    }else if ( column_type == "float" ){
+    } else if (column_type == "float") {
       Column column(column_name, kTypeFloat, column_index++, flag_nullable, flag_unique);
       columns_list.emplace_back(&column);
     }
@@ -215,16 +216,16 @@ dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext *conte
   for (auto itr = columns_list.begin(); itr != columns_list.end(); ++itr) {
     columns.emplace_back(&(*itr));
   }
-  //根据columns创建TableSchema
+  // 根据columns创建TableSchema
   TableSchema table_schema(columns);
-//  Transaction *txn{};
+  //  Transaction *txn{};
   TableInfo *table_info;
   //  xjj TODO:Finish this
   dbs_[current_db_]->catalog_mgr_->CreateTable(table_name, &table_schema, nullptr, table_info);
-//  if ( dbs_[current_db_]->catalog_mgr_->CreateTable(table_name, &table_schema, nullptr, table_info) ) return DB_FAILED;
-//  else {
-//
-//  }
+  //  if ( dbs_[current_db_]->catalog_mgr_->CreateTable(table_name, &table_schema, nullptr, table_info) ) return
+  //  DB_FAILED; else {
+  //
+  //  }
   return DB_SUCCESS;
 }
 
@@ -268,16 +269,16 @@ dberr_t ExecuteEngine::ExecuteCreateIndex(pSyntaxNode ast, ExecuteContext *conte
     transform(index_type.begin(), index_type.end(), index_type.begin(), ::tolower);
     if (index_type == "bptree") {
       // TODO: 这里目前并没有index的type入参，默认只有bplustree
-      IndexInfo* tmp_index_info;
+      IndexInfo *tmp_index_info;
       dbs_[current_db_]->catalog_mgr_->CreateIndex(table_name, index_name, index_keys, nullptr, tmp_index_info);
-      TableInfo* tmp_table_info;
+      TableInfo *tmp_table_info;
       dbs_[current_db_]->catalog_mgr_->GetTable(table_name, tmp_table_info);
-      uint32_t* column_index = new uint32_t [index_keys.size()];
+      uint32_t *column_index = new uint32_t[index_keys.size()];
       for (unsigned long i = 0; i < index_keys.size(); ++i) {
         tmp_table_info->GetSchema()->GetColumnIndex(index_keys[i], column_index[i]);
       }
       auto table_iter = tmp_table_info->GetTableHeap()->Begin(nullptr);
-      for (;table_iter != tmp_table_info->GetTableHeap()->End();++table_iter) {
+      for (; table_iter != tmp_table_info->GetTableHeap()->End(); ++table_iter) {
         // 遍历整个表，对每一行都取出响应Index keys插入索引
         vector<Field> fields;
         for (unsigned long i = 0; i < index_keys.size(); ++i) {
@@ -316,7 +317,7 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
 #endif
   auto columns_node = ast->child_;
   // 可能是allColumns也可能是一个columnsList
-  [[maybe_unused]]bool use_all_columns = true;
+  [[maybe_unused]] bool use_all_columns = true;
   vector<string> columns;
   if (columns_node->type_ == kNodeColumnList) {
     use_all_columns = false;
@@ -348,7 +349,7 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
   // TODO: 对table_name，conditions中的列名，columns中的列名做合法性判断
 
   // 利用conditions进行查询
-  TableInfo* table_info;
+  TableInfo *table_info;
   dbs_[current_db_]->catalog_mgr_->GetTable(table_name, table_info);
   vector<RowId> result;
   if (conditions.size() == 0) {
@@ -360,7 +361,7 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
   } else {
     // 是否使用索引
     bool use_index = true;
-    IndexInfo* chosed_index = nullptr;
+    IndexInfo *chosed_index = nullptr;
     // 是否使用复合索引
     bool use_multi_index = true;
     bool is_all_equal = true;
@@ -369,7 +370,7 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
       use_index = false;
     } else {
       // 此时只有一个全为and连接的条件集合，位于conditions[0]
-      for(auto condition : conditions[0]) {
+      for (auto condition : conditions[0]) {
         string condition_operator = condition->val_;
         if (condition_operator != "=") {
           is_all_equal = false;
@@ -467,7 +468,7 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
               return DB_SUCCESS;
             } else {
               // 因为单个列的索引查找我是允许有复合条件的，所以还把result过滤一遍
-              for (auto item= result.begin();item != result.end();) {
+              for (auto item = result.begin(); item != result.end();) {
                 Row tmp_row(*item);
                 table_info->GetTableHeap()->GetTuple(&tmp_row, nullptr);
                 // 这里是遍历conditions[0]的第二层，外面那层是为了找到索引列，里面这层是对索引列条件选出来的结果做其他条件的筛选
@@ -503,147 +504,13 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
           bool is_single_satisfied = true;
           // 这是一坨and连接的条件，只要有一个挂了就整个挂
           for (auto condition : divided_conditions) {
-            string condition_operator = condition->val_;
             // 获取这个condition对应的column序号，才能在field里取值
             uint32_t column_index;
             table_info->GetSchema()->GetColumnIndex(condition->child_->val_, column_index);
             auto column_type = table_info->GetSchema()->GetColumn(column_index)->GetType();
-            if (condition_operator == "=") {
-              if (column_type == TypeId::kTypeInt) {
-                auto tmp_field = Field(column_type, stoi(condition->child_->next_->val_));
-                if (tmp_table_iter->GetField(column_index)->CompareEquals(tmp_field) == CmpBool::kFalse) {
-                  is_single_satisfied = false;
-                  break;
-                }
-              } else if (column_type == TypeId::kTypeChar) {
-                string tmp_str = condition->child_->next_->val_;
-                auto tmp_field = Field(column_type, condition->child_->next_->val_, tmp_str.size(), true);
-                if (tmp_table_iter->GetField(column_index)->CompareEquals(tmp_field) == CmpBool::kFalse) {
-                  is_single_satisfied = false;
-                  break;
-                }
-              } else if (column_type == TypeId::kTypeFloat) {
-                auto tmp_field = Field(column_type, (float)atof(condition->child_->next_->val_));
-                if (tmp_table_iter->GetField(column_index)->CompareEquals(tmp_field) == CmpBool::kFalse) {
-                  is_single_satisfied = false;
-                  break;
-                }
-              }
-            } else if (condition_operator == "<") {
-              if (column_type == TypeId::kTypeInt) {
-                auto tmp_field = Field(column_type, stoi(condition->child_->next_->val_));
-                if (tmp_table_iter->GetField(column_index)->CompareLessThan(tmp_field) == CmpBool::kFalse) {
-                  is_single_satisfied = false;
-                  break;
-                }
-              } else if (column_type == TypeId::kTypeChar) {
-                string tmp_str = condition->child_->next_->val_;
-                auto tmp_field = Field(column_type, condition->child_->next_->val_, tmp_str.size(), true);
-                if (tmp_table_iter->GetField(column_index)->CompareLessThan(tmp_field) == CmpBool::kFalse) {
-                  is_single_satisfied = false;
-                  break;
-                }
-              } else if (column_type == TypeId::kTypeFloat) {
-                auto tmp_field = Field(column_type, (float)atof(condition->child_->next_->val_));
-                if (tmp_table_iter->GetField(column_index)->CompareLessThan(tmp_field) == CmpBool::kFalse) {
-                  is_single_satisfied = false;
-                  break;
-                }
-              }
-            } else if (condition_operator == "<=") {
-              if (column_type == TypeId::kTypeInt) {
-                auto tmp_field = Field(column_type, stoi(condition->child_->next_->val_));
-                if (tmp_table_iter->GetField(column_index)->CompareLessThanEquals(tmp_field) == CmpBool::kFalse) {
-                  is_single_satisfied = false;
-                  break;
-                }
-              } else if (column_type == TypeId::kTypeChar) {
-                string tmp_str = condition->child_->next_->val_;
-                auto tmp_field = Field(column_type, condition->child_->next_->val_, tmp_str.size(), true);
-                if (tmp_table_iter->GetField(column_index)->CompareLessThanEquals(tmp_field) == CmpBool::kFalse) {
-                  is_single_satisfied = false;
-                  break;
-                }
-              } else if (column_type == TypeId::kTypeFloat) {
-                auto tmp_field = Field(column_type, (float)atof(condition->child_->next_->val_));
-                if (tmp_table_iter->GetField(column_index)->CompareLessThanEquals(tmp_field) == CmpBool::kFalse) {
-                  is_single_satisfied = false;
-                  break;
-                }
-              }
-            } else if (condition_operator == ">") {
-              if (column_type == TypeId::kTypeInt) {
-                auto tmp_field = Field(column_type, stoi(condition->child_->next_->val_));
-                if (tmp_table_iter->GetField(column_index)->CompareGreaterThan(tmp_field) == CmpBool::kFalse) {
-                  is_single_satisfied = false;
-                  break;
-                }
-              } else if (column_type == TypeId::kTypeChar) {
-                string tmp_str = condition->child_->next_->val_;
-                auto tmp_field = Field(column_type, condition->child_->next_->val_, tmp_str.size(), true);
-                if (tmp_table_iter->GetField(column_index)->CompareGreaterThan(tmp_field) == CmpBool::kFalse) {
-                  is_single_satisfied = false;
-                  break;
-                }
-              } else if (column_type == TypeId::kTypeFloat) {
-                auto tmp_field = Field(column_type, (float)atof(condition->child_->next_->val_));
-                if (tmp_table_iter->GetField(column_index)->CompareGreaterThan(tmp_field) == CmpBool::kFalse) {
-                  is_single_satisfied = false;
-                  break;
-                }
-              }
-            } else if (condition_operator == ">=") {
-              if (column_type == TypeId::kTypeInt) {
-                auto tmp_field = Field(column_type, stoi(condition->child_->next_->val_));
-                if (tmp_table_iter->GetField(column_index)->CompareGreaterThanEquals(tmp_field) == CmpBool::kFalse) {
-                  is_single_satisfied = false;
-                  break;
-                }
-              } else if (column_type == TypeId::kTypeChar) {
-                string tmp_str = condition->child_->next_->val_;
-                auto tmp_field = Field(column_type, condition->child_->next_->val_, tmp_str.size(), true);
-                if (tmp_table_iter->GetField(column_index)->CompareGreaterThanEquals(tmp_field) == CmpBool::kFalse) {
-                  is_single_satisfied = false;
-                  break;
-                }
-              } else if (column_type == TypeId::kTypeFloat) {
-                auto tmp_field = Field(column_type, (float)atof(condition->child_->next_->val_));
-                if (tmp_table_iter->GetField(column_index)->CompareGreaterThanEquals(tmp_field) == CmpBool::kFalse) {
-                  is_single_satisfied = false;
-                  break;
-                }
-              }
-            } else if (condition_operator == "<>") {
-              if (column_type == TypeId::kTypeInt) {
-                auto tmp_field = Field(column_type, stoi(condition->child_->next_->val_));
-                if (tmp_table_iter->GetField(column_index)->CompareNotEquals(tmp_field) == CmpBool::kFalse) {
-                  is_single_satisfied = false;
-                  break;
-                }
-              } else if (column_type == TypeId::kTypeChar) {
-                string tmp_str = condition->child_->next_->val_;
-                auto tmp_field = Field(column_type, condition->child_->next_->val_, tmp_str.size(), true);
-                if (tmp_table_iter->GetField(column_index)->CompareNotEquals(tmp_field) == CmpBool::kFalse) {
-                  is_single_satisfied = false;
-                  break;
-                }
-              } else if (column_type == TypeId::kTypeFloat) {
-                auto tmp_field = Field(column_type, (float)atof(condition->child_->next_->val_));
-                if (tmp_table_iter->GetField(column_index)->CompareNotEquals(tmp_field) == CmpBool::kFalse) {
-                  is_single_satisfied = false;
-                  break;
-                }
-              }
-            } else if (condition_operator == "is") {
-              if (!tmp_table_iter->GetField(column_index)->IsNull()) {
-                is_single_satisfied = false;
-                break;
-              }
-            } else if (condition_operator == "not") {
-              if (tmp_table_iter->GetField(column_index)->IsNull()) {
-                is_single_satisfied = false;
-                break;
-              }
+            if (!IsSatisfiedRow(tmp_table_iter.operator->(), condition, column_index, column_type)) {
+              is_single_satisfied = false;
+              break;
             }
           }
           if (is_single_satisfied) {
@@ -667,7 +534,8 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
     vector<Row> result_rows;
     // 需要知道要取哪些field的值，（投影操作），所以需要先得到这些field的index，也就是column_indexes
     vector<uint32_t> column_indexes;
-    for (unsigned long i=0;i<result.size();i++) {
+    vector<TypeId> column_types;
+    for (unsigned long i = 0; i < result.size(); i++) {
       auto tmp_row = Row(result[i]);
       table_info->GetTableHeap()->GetTuple(&tmp_row, nullptr);
       result_rows.emplace_back(tmp_row);
@@ -680,15 +548,68 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
     for (auto column : columns) {
       uint32_t column_index;
       table_info->GetSchema()->GetColumnIndex(column, column_index);
+      column_types.emplace_back(table_info->GetSchema()->GetColumn(column_index)->GetType());
       column_indexes.emplace_back(column_index);
     }
-    // TODO: 打印result_rows中的column_indexes处的field值，需要找出最长值，最后格式化打印
-    int* print_length = new int[columns.size()];
+    unsigned long *print_length = new unsigned long[columns.size()];
+    for (unsigned long i = 0; i < columns.size(); ++i) {
+      print_length[i] = 0;
+    }
+    // 先统计一下每一列的长度
     for (auto result_row : result_rows) {
-      for (auto column_index : column_indexes) {
-        // TODO: 从Field中还原出值
-        // result_row.GetField(column_index).
+      for (unsigned long i = 0; i < column_indexes.size(); i++) {
         // 如果长度长于print_length[i]，那么更新print_length
+        unsigned long tmp_length = GetFieldString(result_row.GetField(column_indexes[i]), column_types[i]).size();
+        if (tmp_length > print_length[i]) {
+          print_length[i] = tmp_length;
+        }
+      }
+    }
+    // 打印列名行
+    for (unsigned long i = 0; i < columns.size(); ++i) {
+      if (i == 0) {
+        cout << "+-" << setw(print_length[i]) << setfill('-') << "-"
+             << "-+" << endl;
+      } else {
+        cout << "-" << setw(print_length[i]) << setfill('-') << "-"
+             << "-+" << endl;
+      }
+    }
+    for (unsigned long i = 0; i < columns.size(); ++i) {
+      if (i == 0) {
+        cout << "| " << setw(print_length[i]) << setfill(' ') << left << columns[i] << " |" << endl;
+      } else {
+        cout << " " << setw(print_length[i]) << setfill(' ') << left << columns[i] << " |" << endl;
+      }
+    }
+    for (unsigned long i = 0; i < columns.size(); ++i) {
+      if (i == 0) {
+        cout << "+-" << setw(print_length[i]) << setfill('-') << "-"
+             << "-+" << endl;
+      } else {
+        cout << "-" << setw(print_length[i]) << setfill('-') << "-"
+             << "-+" << endl;
+      }
+    }
+    // 打印数据
+    for (auto result_row : result_rows) {
+      for (unsigned long i = 0; i < columns.size(); ++i) {
+        if (i == 0) {
+          cout << "| " << setw(print_length[i]) << setfill(' ') << left
+               << GetFieldString(result_row.GetField(column_indexes[i]), column_types[i]) << " |" << endl;
+        } else {
+          cout << " " << setw(print_length[i]) << setfill(' ') << left
+               << GetFieldString(result_row.GetField(column_indexes[i]), column_types[i]) << " |" << endl;
+        }
+      }
+      for (unsigned long i = 0; i < columns.size(); ++i) {
+        if (i == 0) {
+          cout << "+-" << setw(print_length[i]) << setfill('-') << "-"
+               << "-+" << endl;
+        } else {
+          cout << "-" << setw(print_length[i]) << setfill('-') << "-"
+               << "-+" << endl;
+        }
       }
     }
     delete[] print_length;
@@ -701,39 +622,41 @@ dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext *context) {
   LOG(INFO) << "ExecuteInsert" << std::endl;
 #endif
   string table_name = ast->child_->val_;
-  TableInfo* table_info;
+  TableInfo *table_info;
   dberr_t get_table_result;
   get_table_result = dbs_[current_db_]->catalog_mgr_->GetTable(table_name, table_info);
-  //获取TableInfo失败，返回状态
+  // 获取TableInfo失败，返回状态
   if (get_table_result != DB_SUCCESS) return get_table_result;
 
   vector<Field> fields;
   auto columns = table_info->GetSchema()->GetColumns();
 
-  //第一个value
+  // 第一个value
   auto val_node = ast->child_->next_->child_;
 
-  //遍历以获取每个field的类型，如果语法树value的结点不够，则报错
-  for ( auto itr = columns.begin(); itr != columns.end()  ; itr++) {
-    //node为空，则insert的数据有错
+  // 遍历以获取每个field的类型，如果语法树value的结点不够，则报错
+  for (auto itr = columns.begin(); itr != columns.end(); itr++) {
+    // node为空，则insert的数据有错
     if (!val_node) {
       cout << "wrong insert format!" << endl;
       return DB_FAILED;
     }
     uint32_t type = (*itr)->GetType();
-    //int
-    if ( type == kTypeInt ) fields.emplace_back( Field(kTypeInt, static_cast<int>(*val_node->val_)));
-    //float
-    else if (type==kTypeFloat) fields.emplace_back( Field(kTypeFloat, static_cast<float>(*val_node->val_) ) );
-    //char
-    else fields.emplace_back( Field(kTypeChar, val_node->val_, strlen(val_node->val_), true) );
+    // int
+    if (type == kTypeInt) fields.emplace_back(Field(kTypeInt, static_cast<int>(*val_node->val_)));
+    // float
+    else if (type == kTypeFloat)
+      fields.emplace_back(Field(kTypeFloat, static_cast<float>(*val_node->val_)));
+    // char
+    else
+      fields.emplace_back(Field(kTypeChar, val_node->val_, strlen(val_node->val_), true));
     val_node = val_node->next_;
   }
   //  int field_type = table_info->GetSchema()->GetColumn()->GetType()
 
   Row row(fields);
-  //插入数据
-  table_info->GetTableHeap()->InsertTuple( row, nullptr);
+  // 插入数据
+  table_info->GetTableHeap()->InsertTuple(row, nullptr);
   return DB_SUCCESS;
 }
 
@@ -748,8 +671,7 @@ dberr_t ExecuteEngine::ExecuteUpdate(pSyntaxNode ast, ExecuteContext *context) {
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteUpdate" << std::endl;
 #endif
-  //TODO: xjj, finish this
-
+  // TODO: xjj, finish this
 
   return DB_SUCCESS;
 }
@@ -792,7 +714,7 @@ dberr_t ExecuteEngine::ExecuteQuit(pSyntaxNode ast, ExecuteContext *context) {
 }
 
 // 判断Row对象是否满足condition，condition中涉及到的column在row中为第column_index个
-bool IsSatisfiedRow(Row* row, SyntaxNode* condition, uint32_t column_index, TypeId column_type) {
+bool IsSatisfiedRow(Row *row, SyntaxNode *condition, uint32_t column_index, TypeId column_type) {
   bool is_satisfied = true;
   string condition_operator = condition->val_;
   if (condition_operator == "=") {
@@ -913,4 +835,17 @@ bool IsSatisfiedRow(Row* row, SyntaxNode* condition, uint32_t column_index, Type
     }
   }
   return is_satisfied;
+}
+
+string GetFieldString(Field *field, TypeId type) {
+  if (type == TypeId::kTypeInt) {
+    return to_string(field->GetInt());
+  } else if (type == TypeId::kTypeFloat) {
+    return to_string(field->GetFloat());
+  } else if (type == TypeId::kTypeChar) {
+    string tmp_string = field->GetChars();
+    return tmp_string;
+  } else {
+    throw Exception("What is this?");
+  }
 }
