@@ -346,11 +346,32 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
     conditions.emplace_back(now_condition);
     now_condition.clear();
   }
-  // TODO: 对table_name，conditions中的列名，columns中的列名做合法性判断
-
   // 利用conditions进行查询
   TableInfo *table_info;
-  dbs_[current_db_]->catalog_mgr_->GetTable(table_name, table_info);
+  if (dbs_[current_db_]->catalog_mgr_->GetTable(table_name, table_info) == DB_TABLE_NOT_EXIST) {
+    cout << "ERROR: Table not exist" << endl;
+    return DB_FAILED;
+  }
+  vector<uint32_t> column_indexes;
+  vector<TypeId> column_types;
+
+  // 如果是select * ，那就是所有columns
+  if (use_all_columns) {
+    for (auto column : table_info->GetSchema()->GetColumns()) {
+      columns.emplace_back(column->GetName());
+    }
+  }
+  // 需要知道要取一个row中哪些field的值，（投影操作），所以需要先得到这些field的index，也就是column_indexes
+  for (auto column : columns) {
+    uint32_t column_index;
+    if (table_info->GetSchema()->GetColumnIndex(column, column_index) == DB_COLUMN_NAME_NOT_EXIST) {
+      cout << "ERROR: Column not exist" << endl;
+      return DB_FAILED;
+    }
+    column_types.emplace_back(table_info->GetSchema()->GetColumn(column_index)->GetType());
+    column_indexes.emplace_back(column_index);
+  }
+
   vector<RowId> result;
   if (conditions.size() == 0) {
     auto table_iter = table_info->GetTableHeap()->Begin(nullptr);
@@ -532,9 +553,7 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
   } else {
     // 打印result
     vector<Row> result_rows;
-    // 需要知道要取哪些field的值，（投影操作），所以需要先得到这些field的index，也就是column_indexes
-    vector<uint32_t> column_indexes;
-    vector<TypeId> column_types;
+    // 需要知道要取一个row中哪些field的值，（投影操作），所以需要先得到这些field的index，也就是column_indexes
     for (unsigned long i = 0; i < result.size(); i++) {
       auto tmp_row = Row(result[i]);
       table_info->GetTableHeap()->GetTuple(&tmp_row, nullptr);
