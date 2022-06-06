@@ -9,6 +9,7 @@
 
 bool IsSatisfiedRow(Row *row, SyntaxNode *condition, uint32_t column_index, TypeId column_type);
 string GetFieldString(Field *field, TypeId type);
+vector<RowId> GetSatisfiedRowIds(vector<vector<SyntaxNode*>> conditions, TableInfo* table_info, vector<IndexInfo *> indexes);
 string path = "./db/";
 
 ExecuteEngine::ExecuteEngine() {
@@ -371,182 +372,9 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
     column_types.emplace_back(table_info->GetSchema()->GetColumn(column_index)->GetType());
     column_indexes.emplace_back(column_index);
   }
-
-  vector<RowId> result;
-  if (conditions.size() == 0) {
-    auto table_iter = table_info->GetTableHeap()->Begin(nullptr);
-    while (table_iter != table_info->GetTableHeap()->End()) {
-      result.emplace_back((*table_iter).GetRowId());
-      ++table_iter;
-    }
-  } else {
-    // 是否使用索引
-    bool use_index = true;
-    IndexInfo *chosed_index = nullptr;
-    // 是否使用复合索引
-    bool use_multi_index = true;
-    bool is_all_equal = true;
-    // 如果有or，那么不用索引，全表扫描
-    if (conditions.size() > 1) {
-      use_index = false;
-    } else {
-      // 此时只有一个全为and连接的条件集合，位于conditions[0]
-      for (auto condition : conditions[0]) {
-        string condition_operator = condition->val_;
-        if (condition_operator != "=") {
-          is_all_equal = false;
-        }
-        if (condition_operator == "<>" || condition_operator == "is" || condition_operator == "not") {
-          use_index = false;
-          break;
-        }
-      }
-      vector<IndexInfo *> indexes;
-      dbs_[current_db_]->catalog_mgr_->GetTableIndexes(table_name, indexes);
-      // 简单起见，这里只做（所有索引字段条件为等于）的复合索引查询或简单单列索引的索引查询）
-      // 先判断有没有必要做复合索引查询
-      if (is_all_equal && conditions[0].size() > 1) {
-        // 如果可以做复合索引查询，那么找找有没有完全匹配的复合索引
-        for (auto index : indexes) {
-          auto tmp_columns = index->GetIndexKeySchema()->GetColumns();
-          bool all_same = true;
-          if (tmp_columns.size() != conditions[0].size()) {
-            all_same = false;
-          } else {
-            for (auto condition : conditions[0]) {
-              bool single_same = false;
-              for (auto tmp_column : tmp_columns) {
-                if (tmp_column->GetName() == condition->child_->val_) {
-                  single_same = true;
-                  break;
-                }
-              }
-              if (!single_same) {
-                all_same = false;
-                break;
-              }
-            }
-          }
-          if (all_same) {
-            chosed_index = index;
-            break;
-          }
-        }
-        if (chosed_index == nullptr) {
-          use_multi_index = false;
-        }
-      }
-      if (!use_multi_index) {
-        // 寻找单个索引
-        for (auto index : indexes) {
-          auto tmp_columns = index->GetIndexKeySchema()->GetColumns();
-          if (tmp_columns.size() > 1) {
-            continue;
-          } else {
-            for (auto condition : conditions[0]) {
-              // 找到第一个符合的就行，不过多计算优化
-              if (condition->child_->val_ == tmp_columns[0]->GetName()) {
-                chosed_index = index;
-                break;
-              }
-            }
-          }
-        }
-      }
-    }
-    if (use_index && chosed_index != nullptr) {
-      // 单个condition
-      // 用索引进行查找
-      // int key_length = chosed_index->GetKeyLength();
-      // 先构建一个索引查找的Row对象
-      vector<Field> fields;
-      for (auto column : chosed_index->GetIndexKeySchema()->GetColumns()) {
-        for (auto condition : conditions[0]) {
-          if (condition->child_->val_ == column->GetName()) {
-            if (column->GetType() == TypeId::kTypeInt) {
-              fields.emplace_back(Field(column->GetType(), stoi(condition->child_->next_->val_)));
-            } else if (column->GetType() == TypeId::kTypeChar) {
-              string tmp_str = condition->child_->next_->val_;
-              fields.emplace_back(Field(column->GetType(), condition->child_->next_->val_, tmp_str.size(), true));
-            } else if (column->GetType() == TypeId::kTypeFloat) {
-              fields.emplace_back(Field(column->GetType(), (float)atof(condition->child_->next_->val_)));
-            }
-          }
-        }
-      }
-      Row row(fields);
-      if (use_multi_index) {
-        if (chosed_index->GetIndex()->ScanKey(row, result, nullptr, "=") == DB_KEY_NOT_FOUND) {
-          cout << "empty set" << endl;
-          return DB_SUCCESS;
-        }
-      } else {
-        // 用单个列的索引
-        for (auto condition : conditions[0]) {
-          if (condition->child_->val_ == chosed_index->GetIndexKeySchema()->GetColumn(0)->GetName()) {
-            if (chosed_index->GetIndex()->ScanKey(row, result, nullptr, condition->val_) == DB_KEY_NOT_FOUND) {
-              cout << "empty set" << endl;
-              return DB_SUCCESS;
-            } else {
-              // 因为单个列的索引查找我是允许有复合条件的，所以还把result过滤一遍
-              for (auto item = result.begin(); item != result.end();) {
-                Row tmp_row(*item);
-                table_info->GetTableHeap()->GetTuple(&tmp_row, nullptr);
-                // 这里是遍历conditions[0]的第二层，外面那层是为了找到索引列，里面这层是对索引列条件选出来的结果做其他条件的筛选
-                bool is_item_satisfied = true;
-                for (auto tmp_condition : conditions[0]) {
-                  uint32_t column_index;
-                  table_info->GetSchema()->GetColumnIndex(tmp_condition->child_->val_, column_index);
-                  auto column_type = table_info->GetSchema()->GetColumn(column_index)->GetType();
-                  if (!IsSatisfiedRow(&tmp_row, tmp_condition, column_index, column_type)) {
-                    is_item_satisfied = false;
-                    break;
-                  }
-                }
-                if (!is_item_satisfied) {
-                  result.erase(item);
-                } else {
-                  item++;
-                }
-              }
-            }
-            break;
-          }
-        }
-      }
-    } else {
-      // 可能有多个condition（指or相连的）
-      // 全表扫描，符合的加进result
-      auto tmp_table_iter = table_info->GetTableHeap()->Begin(nullptr);
-      while (tmp_table_iter != table_info->GetTableHeap()->End()) {
-        bool is_satisfied = false;
-        // 遍历条件
-        for (auto divided_conditions : conditions) {
-          bool is_single_satisfied = true;
-          // 这是一坨and连接的条件，只要有一个挂了就整个挂
-          for (auto condition : divided_conditions) {
-            // 获取这个condition对应的column序号，才能在field里取值
-            uint32_t column_index;
-            table_info->GetSchema()->GetColumnIndex(condition->child_->val_, column_index);
-            auto column_type = table_info->GetSchema()->GetColumn(column_index)->GetType();
-            if (!IsSatisfiedRow(tmp_table_iter.operator->(), condition, column_index, column_type)) {
-              is_single_satisfied = false;
-              break;
-            }
-          }
-          if (is_single_satisfied) {
-            // 在一堆or中，只要有一个满足即可
-            is_satisfied = true;
-            break;
-          }
-        }
-        if (is_satisfied) {
-          result.emplace_back((*tmp_table_iter).GetRowId());
-        }
-        ++tmp_table_iter;
-      }
-    }
-  }
+  vector<IndexInfo *> indexes;
+  dbs_[current_db_]->catalog_mgr_->GetTableIndexes(table_name, indexes);
+  auto result = GetSatisfiedRowIds(conditions, table_info, indexes);
   if (result.size() == 0) {
     cout << "empty set" << endl;
     return DB_SUCCESS;
@@ -633,7 +461,7 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
     }
     delete[] print_length;
   }
-  return DB_FAILED;
+  return DB_SUCCESS;
 }
 
 dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext *context) {
@@ -867,4 +695,179 @@ string GetFieldString(Field *field, TypeId type) {
   } else {
     throw Exception("What is this?");
   }
+}
+
+vector<RowId> GetSatisfiedRowIds(vector<vector<SyntaxNode*>> conditions, TableInfo* table_info, vector<IndexInfo *> indexes) {
+  vector<RowId> result;
+  if (conditions.size() == 0) {
+    auto table_iter = table_info->GetTableHeap()->Begin(nullptr);
+    while (table_iter != table_info->GetTableHeap()->End()) {
+      result.emplace_back((*table_iter).GetRowId());
+      ++table_iter;
+    }
+  } else {
+    // 是否使用索引
+    bool use_index = true;
+    IndexInfo *chosed_index = nullptr;
+    // 是否使用复合索引
+    bool use_multi_index = true;
+    bool is_all_equal = true;
+    // 如果有or，那么不用索引，全表扫描
+    if (conditions.size() > 1) {
+      use_index = false;
+    } else {
+      // 此时只有一个全为and连接的条件集合，位于conditions[0]
+      for (auto condition : conditions[0]) {
+        string condition_operator = condition->val_;
+        if (condition_operator != "=") {
+          is_all_equal = false;
+        }
+        if (condition_operator == "<>" || condition_operator == "is" || condition_operator == "not") {
+          use_index = false;
+          break;
+        }
+      }
+      // 简单起见，这里只做（所有索引字段条件为等于）的复合索引查询或简单单列索引的索引查询）
+      // 先判断有没有必要做复合索引查询
+      if (is_all_equal && conditions[0].size() > 1) {
+        // 如果可以做复合索引查询，那么找找有没有完全匹配的复合索引
+        for (auto index : indexes) {
+          auto tmp_columns = index->GetIndexKeySchema()->GetColumns();
+          bool all_same = true;
+          if (tmp_columns.size() != conditions[0].size()) {
+            all_same = false;
+          } else {
+            for (auto condition : conditions[0]) {
+              bool single_same = false;
+              for (auto tmp_column : tmp_columns) {
+                if (tmp_column->GetName() == condition->child_->val_) {
+                  single_same = true;
+                  break;
+                }
+              }
+              if (!single_same) {
+                all_same = false;
+                break;
+              }
+            }
+          }
+          if (all_same) {
+            chosed_index = index;
+            break;
+          }
+        }
+        if (chosed_index == nullptr) {
+          use_multi_index = false;
+        }
+      }
+      if (!use_multi_index) {
+        // 寻找单个索引
+        for (auto index : indexes) {
+          auto tmp_columns = index->GetIndexKeySchema()->GetColumns();
+          if (tmp_columns.size() > 1) {
+            continue;
+          } else {
+            for (auto condition : conditions[0]) {
+              // 找到第一个符合的就行，不过多计算优化
+              if (condition->child_->val_ == tmp_columns[0]->GetName()) {
+                chosed_index = index;
+                break;
+              }
+            }
+          }
+        }
+      }
+    }
+    if (use_index && chosed_index != nullptr) {
+      // 单个condition
+      // 用索引进行查找
+      // int key_length = chosed_index->GetKeyLength();
+      // 先构建一个索引查找的Row对象
+      vector<Field> fields;
+      for (auto column : chosed_index->GetIndexKeySchema()->GetColumns()) {
+        for (auto condition : conditions[0]) {
+          if (condition->child_->val_ == column->GetName()) {
+            if (column->GetType() == TypeId::kTypeInt) {
+              fields.emplace_back(Field(column->GetType(), stoi(condition->child_->next_->val_)));
+            } else if (column->GetType() == TypeId::kTypeChar) {
+              string tmp_str = condition->child_->next_->val_;
+              fields.emplace_back(Field(column->GetType(), condition->child_->next_->val_, tmp_str.size(), true));
+            } else if (column->GetType() == TypeId::kTypeFloat) {
+              fields.emplace_back(Field(column->GetType(), (float)atof(condition->child_->next_->val_)));
+            }
+          }
+        }
+      }
+      Row row(fields);
+      if (use_multi_index) {
+        if (chosed_index->GetIndex()->ScanKey(row, result, nullptr, "=") == DB_KEY_NOT_FOUND) {
+          return result;
+        }
+      } else {
+        // 用单个列的索引
+        for (auto condition : conditions[0]) {
+          if (condition->child_->val_ == chosed_index->GetIndexKeySchema()->GetColumn(0)->GetName()) {
+            if (chosed_index->GetIndex()->ScanKey(row, result, nullptr, condition->val_) == DB_KEY_NOT_FOUND) {
+              return result;
+            } else {
+              // 因为单个列的索引查找我是允许有复合条件的，所以还把result过滤一遍
+              for (auto item = result.begin(); item != result.end();) {
+                Row tmp_row(*item);
+                table_info->GetTableHeap()->GetTuple(&tmp_row, nullptr);
+                // 这里是遍历conditions[0]的第二层，外面那层是为了找到索引列，里面这层是对索引列条件选出来的结果做其他条件的筛选
+                bool is_item_satisfied = true;
+                for (auto tmp_condition : conditions[0]) {
+                  uint32_t column_index;
+                  table_info->GetSchema()->GetColumnIndex(tmp_condition->child_->val_, column_index);
+                  auto column_type = table_info->GetSchema()->GetColumn(column_index)->GetType();
+                  if (!IsSatisfiedRow(&tmp_row, tmp_condition, column_index, column_type)) {
+                    is_item_satisfied = false;
+                    break;
+                  }
+                }
+                if (!is_item_satisfied) {
+                  result.erase(item);
+                } else {
+                  item++;
+                }
+              }
+            }
+            break;
+          }
+        }
+      }
+    } else {
+      // 可能有多个condition（指or相连的）
+      // 全表扫描，符合的加进result
+      auto tmp_table_iter = table_info->GetTableHeap()->Begin(nullptr);
+      while (tmp_table_iter != table_info->GetTableHeap()->End()) {
+        bool is_satisfied = false;
+        // 遍历条件
+        for (auto divided_conditions : conditions) {
+          bool is_single_satisfied = true;
+          // 这是一坨and连接的条件，只要有一个挂了就整个挂
+          for (auto condition : divided_conditions) {
+            // 获取这个condition对应的column序号，才能在field里取值
+            uint32_t column_index;
+            table_info->GetSchema()->GetColumnIndex(condition->child_->val_, column_index);
+            auto column_type = table_info->GetSchema()->GetColumn(column_index)->GetType();
+            if (!IsSatisfiedRow(tmp_table_iter.operator->(), condition, column_index, column_type)) {
+              is_single_satisfied = false;
+              break;
+            }
+          }
+          if (is_single_satisfied) {
+            // 在一堆or中，只要有一个满足即可
+            is_satisfied = true;
+            break;
+          }
+        }
+        if (is_satisfied) {
+          result.emplace_back((*tmp_table_iter).GetRowId());
+        }
+        ++tmp_table_iter;
+      }
+    }
+  }
+  return result;
 }
