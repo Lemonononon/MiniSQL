@@ -40,8 +40,8 @@ uint32_t TableMetadata::SerializeTo(char *buf) const {
 }
 
 uint32_t TableMetadata::GetSerializedSize() const {
-  // magic_number(4)+table_id_t(4)+table_name_(MACH_STR_SERIALIZED_SIZE(table_name_))+root_page_id_(4)+schema *(8)
-  return 20 + MACH_STR_SERIALIZED_SIZE(table_name_);
+  // magic_number(4)+table_id_t(4)+table_name_(MACH_STR_SERIALIZED_SIZE(table_name_))+root_page_id_(4)
+  return 12 + MACH_STR_SERIALIZED_SIZE(table_name_) + schema_->GetSerializedSize();
 }
 
 /**

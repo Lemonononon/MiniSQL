@@ -13,18 +13,23 @@ uint32_t Schema::SerializeTo(char *buf) const {
   buf += 4;
   // write column pointer(8 byte) one by one
   for (uint32_t i = 0; i < GetColumnCount(); i++) {
-    MACH_WRITE_TO(Column *, buf, columns_[i]);
-    buf += 8;
-    ofs += 8;
+    columns_[i]->SerializeTo(buf);
+    buf += columns_[i]->GetSerializedSize();
+    ofs += columns_[i]->GetSerializedSize();
   }
   return ofs;
 }
 
 uint32_t Schema::GetSerializedSize() const {
   // replace with your code here
-  // magic number(4 byte) + column size(4 byte) + pointers in columns_(8 byte one pointer)
-  if (columns_.size() != 0)
-    return 4 + 8 * columns_.size();
+  // magic number(4 byte) + column size(4 byte) + columns_
+  if (!columns_.empty()){
+    uint32_t size = 8;
+    for (uint32_t i = 0; i < GetColumnCount(); i++) {
+      size += columns_[i]->GetSerializedSize();
+    }
+    return size;
+  }
   else
     return 0;
 }
@@ -43,9 +48,11 @@ uint32_t Schema::DeserializeFrom(char *buf, Schema *&schema, MemHeap *heap) {
   // 利用buf内数据赋值给schema,再将schema放入heap
   std::vector<Column *> c;
   for (uint32_t i = 0; i < size; i++) {
-    c.emplace_back((Column *)MACH_READ_FROM(Column *, buf));  // emplace_back is push_back with judge
-    buf += 8;
-    ofs += 8;
+    Column* temp;
+    Column::DeserializeFrom(buf,temp,heap);
+    c.emplace_back(temp);  // emplace_back is push_back with judge
+    buf += temp->GetSerializedSize();
+    ofs += temp->GetSerializedSize();
   }
   schema = ALLOC_P(heap, Schema)(c);
   return ofs;
