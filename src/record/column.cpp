@@ -100,6 +100,7 @@ uint32_t Column::DeserializeFrom(char *buf, Column *&column, MemHeap *heap) {
     name[i] = MACH_READ_FROM(char, buf);
     buf++;
   }
+  name[len] = 0;
   std::string column_name(name);
   // read type
   TypeId type = MACH_READ_FROM(TypeId, buf);

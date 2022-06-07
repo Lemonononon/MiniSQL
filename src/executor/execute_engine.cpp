@@ -193,7 +193,7 @@ dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext *conte
   uint32_t column_index = 0;
 
   // 记录所有的column对象，后续需要所有column对象的指针来创建TableSchema
-  vector<Column> columns_list;
+  // vector<Column> columns_list;
   while (node && node->type_ != kNodeColumnList) {
     // column默认是可以为空，不unique的
     bool flag_nullable = true;
@@ -215,14 +215,17 @@ dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext *conte
     // int, float, char
     if (column_type == "char") {
       uint32_t column_length = atoi(node->child_->next_->child_->val_);
-      Column column(column_name, kTypeChar, column_length, flag_nullable, flag_unique);
-      columns_list.emplace_back(column);
+      // Column column(column_name, kTypeChar, column_length, flag_nullable, flag_unique);
+      auto column = new Column(column_name, kTypeChar, column_length, flag_nullable, flag_unique);
+      columns.emplace_back(column);
     } else if (column_type == "int") {
-      Column column(column_name, kTypeInt, column_index++, flag_nullable, flag_unique);
-      columns_list.emplace_back(&column);
+      // Column column(column_name, kTypeInt, column_index++, flag_nullable, flag_unique);
+      auto column = new Column(column_name, kTypeInt, column_index++, flag_nullable, flag_unique);
+      columns.emplace_back(column);
     } else if (column_type == "float") {
-      Column column(column_name, kTypeFloat, column_index++, flag_nullable, flag_unique);
-      columns_list.emplace_back(&column);
+      // Column column(column_name, kTypeFloat, column_index++, flag_nullable, flag_unique);
+      auto column = new Column(column_name, kTypeFloat, column_index++, flag_nullable, flag_unique);
+      columns.emplace_back(column);
     }
     node = node->next_;
   }
@@ -237,9 +240,9 @@ dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext *conte
   }
   // TODO: 为主键建立索引
 
-  for (auto itr = columns_list.begin(); itr != columns_list.end(); ++itr) {
+  /*for (auto itr = columns_list.begin(); itr != columns_list.end(); ++itr) {
     columns.emplace_back(&(*itr));
-  }
+  }*/
   // 根据columns创建TableSchema
   TableSchema table_schema(columns);
   //  Transaction *txn{};

@@ -83,6 +83,7 @@ uint32_t IndexMetadata::DeserializeFrom(char *buf, IndexMetadata *&index_meta, M
     name[i] = MACH_READ_FROM(char, buf);
     buf++;
   }
+  name[len] = 0;
   std::string index_name_(name);
   //read table_id_t
   uint32_t table_id_t = MACH_READ_UINT32(buf);

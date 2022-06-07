@@ -73,6 +73,7 @@ uint32_t TableMetadata::DeserializeFrom(char *buf, TableMetadata *&table_meta, M
     name[i] = MACH_READ_FROM(char, buf);
     buf++;
   }
+  name[len] = 0;
   std::string table_name_(name);
   // 读取root_page_id_
   int32_t root_page_id_ = MACH_READ_INT32(buf);
