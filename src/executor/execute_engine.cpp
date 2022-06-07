@@ -533,7 +533,6 @@ dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext *context) {
   }
   // 第一个value
   auto val_node = ast->child_->next_->child_;
-
   // 遍历以获取每个field的类型，如果语法树value的结点不够，则报错
   for (auto itr = columns.begin(); itr != columns.end(); itr++) {
     // node为空，则insert的数据有错
@@ -542,20 +541,28 @@ dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext *context) {
       return DB_FAILED;
     }
     uint32_t type = (*itr)->GetType();
+    cout << "column type: " << type << endl;
+    cout << val_node->val_ << endl;
     // int
-    if (type == kTypeInt) fields.emplace_back(Field(kTypeInt, static_cast<int>(*val_node->val_)));
+    if (type == kTypeInt) {
+      cout << atoi(val_node->val_) << endl;
+      fields.emplace_back(Field(kTypeInt, atoi(val_node->val_)));
+    }
     // float
-    else if (type == kTypeFloat)
-      fields.emplace_back(Field(kTypeFloat, static_cast<float>(*val_node->val_)));
+    else if (type == kTypeFloat) {
+      fields.emplace_back(Field(kTypeFloat, static_cast<float>(atof(val_node->val_))));
+    }
     // char
-    else
+    else {
       fields.emplace_back(Field(kTypeChar, val_node->val_, strlen(val_node->val_), true));
+    }
     val_node = val_node->next_;
   }
   //  int field_type = table_info->GetSchema()->GetColumn()->GetType()
 
   Row row(fields);
   // 插入数据
+  cout << "Inserting..." << endl;
   table_info->GetTableHeap()->InsertTuple(row, nullptr);
   dbs_[current_db_]->bpm_->FlushAllPages();
   return DB_SUCCESS;
