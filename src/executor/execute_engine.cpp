@@ -158,6 +158,10 @@ dberr_t ExecuteEngine::ExecuteShowTables(pSyntaxNode ast, ExecuteContext *contex
   LOG(INFO) << "ExecuteShowTables" << std::endl;
 #endif
   std::vector<TableInfo *> tables;
+  if (dbs_.find(current_db_) == dbs_.end()) {
+    cout << "ERROR: No current database" << endl;
+    return DB_FAILED;
+  }
   if (dbs_[current_db_]->catalog_mgr_->GetTables(tables))
     return DB_FAILED;
   else {
@@ -182,7 +186,7 @@ dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext *conte
 
   // 记录所有的column对象，后续需要所有column对象的指针来创建TableSchema
   vector<Column> columns_list;
-  while (node) {
+  while (node && node->type_ != kNodeColumnList) {
     // column默认是可以为空，不unique的
     bool flag_nullable = true;
     bool flag_unique = false;
@@ -190,16 +194,17 @@ dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext *conte
     string constraint;
     if (node->val_) {
       constraint = node->val_;
-      flag_nullable = false;
-      flag_unique = true;
       // 如果是unique，只需要将Column中的unique_置为true
-      // 如果是primary key，则需要额外的操作 TODO: 需要什么操作？
+      if (constraint == "unique") {
+        flag_unique = true;
+      }
+      // 暂不支持not null
     }
     string column_name = node->child_->val_;
     string column_type = node->child_->next_->val_;
-    uint32_t length;
+    // uint32_t length;
     //    Column column_list = new Column*[];
-    Column *a[10];
+    // Column *a[10];
     // int, float, char
     if (column_type == "char") {
       uint32_t column_length = atoi(node->child_->next_->child_->val_);
@@ -214,6 +219,17 @@ dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext *conte
     }
     node = node->next_;
   }
+  // TODO: 处理末尾的primary key, 猜测是通过为主键建立索引以保证其唯一性，插入重复数据时会出错
+  vector<string> primary_keys;
+  if (node) {
+    auto primary_key_node = node->child_;
+    while (primary_key_node) {
+      primary_keys.emplace_back(primary_key_node->val_);
+      primary_key_node = primary_key_node->next_;
+    }
+  }
+  // TODO: 为主键建立索引
+
   for (auto itr = columns_list.begin(); itr != columns_list.end(); ++itr) {
     columns.emplace_back(&(*itr));
   }
@@ -222,11 +238,11 @@ dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext *conte
   //  Transaction *txn{};
   TableInfo *table_info;
   //  xjj TODO:Finish this
-  dbs_[current_db_]->catalog_mgr_->CreateTable(table_name, &table_schema, nullptr, table_info);
-  //  if ( dbs_[current_db_]->catalog_mgr_->CreateTable(table_name, &table_schema, nullptr, table_info) ) return
-  //  DB_FAILED; else {
-  //
-  //  }
+  if (dbs_[current_db_]->catalog_mgr_->CreateTable(table_name, &table_schema, nullptr, table_info) == DB_TABLE_ALREADY_EXIST) {
+    cout << "ERROR: Table name already exist" << endl;
+    return DB_FAILED;
+  }
+  dbs_[current_db_]->bpm_->FlushAllPages();
   return DB_SUCCESS;
 }
 
@@ -317,8 +333,9 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
   LOG(INFO) << "ExecuteSelect" << std::endl;
 #endif
   auto columns_node = ast->child_;
+  ast = ast->child_;
   // 可能是allColumns也可能是一个columnsList
-  [[maybe_unused]] bool use_all_columns = true;
+  bool use_all_columns = true;
   vector<string> columns;
   if (columns_node->type_ == kNodeColumnList) {
     use_all_columns = false;
@@ -356,11 +373,12 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
   }
   vector<uint32_t> column_indexes;
   vector<TypeId> column_types;
-
   // 如果是select * ，那就是所有columns
   if (use_all_columns) {
+    cout << table_info->GetSchema()->GetColumns().size() << endl;
     for (auto column : table_info->GetSchema()->GetColumns()) {
       columns.emplace_back(column->GetName());
+      cout << column->GetName() << endl;
     }
   }
   // 需要知道要取一个row中哪些field的值，（投影操作），所以需要先得到这些field的index，也就是column_indexes
