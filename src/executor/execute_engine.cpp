@@ -342,6 +342,7 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
         conditions.emplace_back(now_condition);
         now_condition.clear();
       }
+      ast = ast->child_;
     }
     now_condition.emplace_back(ast);
     conditions.emplace_back(now_condition);
