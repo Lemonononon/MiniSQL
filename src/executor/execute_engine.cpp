@@ -212,7 +212,6 @@ dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext *conte
     string column_type = node->child_->next_->val_;
     // uint32_t length;
     //    Column column_list = new Column*[];
-    // Column *a[10];
     // int, float, char
     if (column_type == "char") {
       uint32_t column_length = atoi(node->child_->next_->child_->val_);
@@ -572,8 +571,70 @@ dberr_t ExecuteEngine::ExecuteDelete(pSyntaxNode ast, ExecuteContext *context) {
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteDelete" << std::endl;
 #endif
-  return DB_FAILED;
-}
+  vector<vector<pSyntaxNode>> conditions;
+  vector<pSyntaxNode> now_condition;
+  // 首先根据语法树，找到需要从哪张表里删除
+  ast = ast->child_;
+  string table_name = ast->val_;
+  // 如果没有条件，则删除所有table中的记录
+  TableInfo *table_info;
+  if (dbs_[current_db_]->catalog_mgr_->GetTable(table_name, table_info) == DB_TABLE_NOT_EXIST) {
+    cout << "ERROR: Table not exist" << endl;
+    return DB_FAILED;
+  }
+  TableHeap * table_heap = table_info->GetTableHeap();
+  /*if (!ast->next_){
+    for(auto itr=table_heap->Begin(nullptr);itr!=table_heap->End();itr++){
+          table_heap->ApplyDelete(itr->GetRowId(), nullptr);
+    }
+    // TODO:刷盘，但是每次删除就刷的话会不会开销太大？
+  }
+  else{
+    // 获取condition
+      ast = ast->next_->child_;
+      while (ast->type_ == kNodeConnector) {
+        now_condition.emplace_back(ast->child_->next_);
+        string connector = ast->val_;
+        if (connector == "or") {
+          conditions.emplace_back(now_condition);
+          now_condition.clear();
+        }
+        ast = ast->child_;
+      }
+      now_condition.emplace_back(ast);
+      conditions.emplace_back(now_condition);
+      now_condition.clear();
+      // 利用conditions进行查询
+      vector<IndexInfo *> indexes;
+      vector<RowId> results = GetSatisfiedRowIds(conditions, table_info,indexes);
+      for(uint32_t i=0;i<results.size();i++){
+        table_heap->ApplyDelete(results[i], nullptr);
+      }*/
+    if(ast->next_) {
+      ast = ast->next_->child_;
+      while (ast->type_ == kNodeConnector) {
+        now_condition.emplace_back(ast->child_->next_);
+        string connector = ast->val_;
+        if (connector == "or") {
+          conditions.emplace_back(now_condition);
+          now_condition.clear();
+        }
+        ast = ast->child_;
+      }
+      now_condition.emplace_back(ast);
+      conditions.emplace_back(now_condition);
+      now_condition.clear();
+    }
+    // 利用conditions进行查询
+    vector<IndexInfo *> indexes;
+    vector<RowId> results = GetSatisfiedRowIds(conditions, table_info,indexes);
+    for(uint32_t i=0;i<results.size();i++){
+      table_heap->ApplyDelete(results[i], nullptr);
+    }
+    cout<<"Query OK, "<< results.size()<<" rows affected"<<endl;
+    return DB_SUCCESS;
+  }
+
 
 dberr_t ExecuteEngine::ExecuteUpdate(pSyntaxNode ast, ExecuteContext *context) {
 #ifdef ENABLE_EXECUTE_DEBUG
