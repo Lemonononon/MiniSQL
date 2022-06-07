@@ -33,15 +33,15 @@ uint32_t TableMetadata::SerializeTo(char *buf) const {
   buf += 4;
   ofs += 4;
   // 写入schema
-  MACH_WRITE_TO(Schema *, buf, schema_);
-  buf += 8;
-  ofs += 8;
+  schema_->SerializeTo(buf);
+  buf += schema_->GetSerializedSize();
+  ofs += schema_->GetSerializedSize();
   return ofs;
 }
 
 uint32_t TableMetadata::GetSerializedSize() const {
-  // magic_number(4)+table_id_t(4)+table_name_(MACH_STR_SERIALIZED_SIZE(table_name_))+root_page_id_(4)+schema *(8)
-  return 20 + MACH_STR_SERIALIZED_SIZE(table_name_);
+  // magic_number(4)+table_id_t(4)+table_name_(MACH_STR_SERIALIZED_SIZE(table_name_))+root_page_id_(4)
+  return 12 + MACH_STR_SERIALIZED_SIZE(table_name_) + schema_->GetSerializedSize();
 }
 
 /**
@@ -79,9 +79,10 @@ uint32_t TableMetadata::DeserializeFrom(char *buf, TableMetadata *&table_meta, M
   buf += 4;
   ofs += 4;
   // 读取schema
-  const TableSchema *schema_ = MACH_READ_FROM(Schema *, buf);
-  buf += 8;
-  ofs += 8;
+  Schema *schema_;
+  Schema::DeserializeFrom(buf,schema_,heap);
+  buf += schema_->GetSerializedSize();
+  ofs += schema_->GetSerializedSize();
   // 调用create函数,将反序列化得到的数据填到heap
   table_meta = TableMetadata::Create(table_id_, table_name_, root_page_id_, (TableSchema *)schema_, heap);
   return ofs;

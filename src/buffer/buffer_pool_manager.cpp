@@ -158,6 +158,19 @@ bool BufferPoolManager::FlushPage(page_id_t page_id) {
   return true;
 }
 
+bool BufferPoolManager::FlushAllPages() {
+  for (size_t i = 0; i < pool_size_; ++i) {
+    if (pages_[i].page_id_ != INVALID_PAGE_ID) {
+      if (FlushPage(pages_[i].page_id_)) {
+        cout << "success" << endl;
+      } else {
+        cout << "failed" << endl;
+      }
+    }
+  }
+  return true;
+}
+
 page_id_t BufferPoolManager::AllocatePage() {
   int next_page_id = disk_manager_->AllocatePage();
   return next_page_id;
