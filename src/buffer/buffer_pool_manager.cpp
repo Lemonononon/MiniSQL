@@ -161,7 +161,11 @@ bool BufferPoolManager::FlushPage(page_id_t page_id) {
 bool BufferPoolManager::FlushAllPages() {
   for (size_t i = 0; i < pool_size_; ++i) {
     if (pages_[i].page_id_ != INVALID_PAGE_ID) {
-      FlushPage(pages_[i].page_id_);
+      if (FlushPage(pages_[i].page_id_)) {
+        cout << "success" << endl;
+      } else {
+        cout << "failed" << endl;
+      }
     }
   }
   return true;
