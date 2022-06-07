@@ -118,6 +118,10 @@ dberr_t ExecuteEngine::ExecuteShowDatabases(pSyntaxNode ast, ExecuteContext *con
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteShowDatabases" << std::endl;
 #endif
+  if (dbs_.size() == 0) {
+    cout << "empty set" << endl;
+    return DB_SUCCESS;
+  }
   int max_length = 8;
   for (auto db : dbs_) {
     if ((int)db.first.length() > max_length) {
@@ -177,6 +181,10 @@ dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext *conte
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteCreateTable" << std::endl;
 #endif
+  if (dbs_.find(current_db_) == dbs_.end()) {
+    cout << "ERROR: No current database" << endl;
+    return DB_FAILED;
+  }
   //  dberr_t CreateTable(const std::string &table_name, TableSchema *schema, Transaction *txn, TableInfo *&table_info);
   string table_name = ast->child_->val_;
   std::vector<Column *> columns;
@@ -250,6 +258,10 @@ dberr_t ExecuteEngine::ExecuteDropTable(pSyntaxNode ast, ExecuteContext *context
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteDropTable" << std::endl;
 #endif
+  if (dbs_.find(current_db_) == dbs_.end()) {
+    cout << "ERROR: No current database" << endl;
+    return DB_FAILED;
+  }
   string table_name = ast->child_->val_;
   if (dbs_[current_db_]->catalog_mgr_->DropTable(table_name)) return DB_FAILED;
   return DB_SUCCESS;
@@ -259,6 +271,10 @@ dberr_t ExecuteEngine::ExecuteShowIndexes(pSyntaxNode ast, ExecuteContext *conte
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteShowIndexes" << std::endl;
 #endif
+  if (dbs_.find(current_db_) == dbs_.end()) {
+    cout << "ERROR: No current database" << endl;
+    return DB_FAILED;
+  }
   return DB_FAILED;
 }
 
@@ -266,6 +282,10 @@ dberr_t ExecuteEngine::ExecuteCreateIndex(pSyntaxNode ast, ExecuteContext *conte
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteCreateIndex" << std::endl;
 #endif
+  if (dbs_.find(current_db_) == dbs_.end()) {
+    cout << "ERROR: No current database" << endl;
+    return DB_FAILED;
+  }
   string index_name = ast->child_->val_;
   ast = ast->child_;
   string table_name = ast->next_->val_;
@@ -322,6 +342,10 @@ dberr_t ExecuteEngine::ExecuteDropIndex(pSyntaxNode ast, ExecuteContext *context
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteDropIndex" << std::endl;
 #endif
+  if (dbs_.find(current_db_) == dbs_.end()) {
+    cout << "ERROR: No current database" << endl;
+    return DB_FAILED;
+  }
   string index_name = ast->child_->val_;
   // dbs_[current_db_]->catalog_mgr_->DropIndex(index_name); // 我不理解，为什么还要table_name
   cout << "Drop index " << index_name << " OK" << endl;
@@ -332,6 +356,10 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteSelect" << std::endl;
 #endif
+  if (dbs_.find(current_db_) == dbs_.end()) {
+    cout << "ERROR: No current database" << endl;
+    return DB_FAILED;
+  }
   auto columns_node = ast->child_;
   ast = ast->child_;
   // 可能是allColumns也可能是一个columnsList
@@ -353,7 +381,7 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
   if (ast->next_) {
     ast = ast->next_->child_;
     while (ast->type_ == kNodeConnector) {
-      now_condition.emplace_back(ast->next_);
+      now_condition.emplace_back(ast->child_->next_);
       string connector = ast->val_;
       if (connector == "or") {
         conditions.emplace_back(now_condition);
@@ -468,14 +496,14 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
                << GetFieldString(result_row.GetField(column_indexes[i]), column_types[i]) << " |" << endl;
         }
       }
-      for (unsigned long i = 0; i < columns.size(); ++i) {
-        if (i == 0) {
-          cout << "+-" << setw(print_length[i]) << setfill('-') << "-"
-               << "-+" << endl;
-        } else {
-          cout << "-" << setw(print_length[i]) << setfill('-') << "-"
-               << "-+" << endl;
-        }
+    }
+    for (unsigned long i = 0; i < columns.size(); ++i) {
+      if (i == 0) {
+        cout << "+-" << setw(print_length[i]) << setfill('-') << "-"
+             << "-+" << endl;
+      } else {
+        cout << "-" << setw(print_length[i]) << setfill('-') << "-"
+             << "-+" << endl;
       }
     }
     delete[] print_length;
@@ -487,16 +515,22 @@ dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext *context) {
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteInsert" << std::endl;
 #endif
+  if (dbs_.find(current_db_) == dbs_.end()) {
+    cout << "ERROR: No current database" << endl;
+    return DB_FAILED;
+  }
   string table_name = ast->child_->val_;
   TableInfo *table_info;
   dberr_t get_table_result;
   get_table_result = dbs_[current_db_]->catalog_mgr_->GetTable(table_name, table_info);
   // 获取TableInfo失败，返回状态
   if (get_table_result != DB_SUCCESS) return get_table_result;
-
+  cout << table_info->GetTableName() << endl;
   vector<Field> fields;
   auto columns = table_info->GetSchema()->GetColumns();
-
+  for (auto column : columns) {
+    cout << column->GetName() << endl;
+  }
   // 第一个value
   auto val_node = ast->child_->next_->child_;
 
@@ -523,6 +557,7 @@ dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext *context) {
   Row row(fields);
   // 插入数据
   table_info->GetTableHeap()->InsertTuple(row, nullptr);
+  dbs_[current_db_]->bpm_->FlushAllPages();
   return DB_SUCCESS;
 }
 
