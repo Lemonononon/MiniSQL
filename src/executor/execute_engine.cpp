@@ -307,6 +307,7 @@ dberr_t ExecuteEngine::ExecuteDropTable(pSyntaxNode ast, ExecuteContext *context
     return DB_FAILED;
   }
   string table_name = ast->child_->val_;
+  // TODO: 删除table中的数据
   switch (dbs_[current_db_]->catalog_mgr_->DropTable(table_name)) {
     case DB_FAILED:
       cout << "ERROR: Table still used" << endl;
