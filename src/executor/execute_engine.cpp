@@ -1056,6 +1056,8 @@ vector<RowId> GetSatisfiedRowIds(vector<vector<SyntaxNode *>> conditions, TableI
         if (chosed_index == nullptr) {
           use_multi_index = false;
         }
+      } else {
+        use_multi_index = false;
       }
       if (!use_multi_index) {
         // 寻找单个索引
