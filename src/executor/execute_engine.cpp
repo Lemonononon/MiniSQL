@@ -274,12 +274,15 @@ dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext *conte
       primary_key_node = primary_key_node->next_;
     }
   }
-  string primary_index_name = "PRIMARY";
-  IndexInfo *primary_index_info;
-  if (dbs_[current_db_]->catalog_mgr_->CreateIndex(table_name, primary_index_name, primary_keys, nullptr, primary_index_info)){
-//    cout << "Primary Key Index already exist" << endl;
-    return DB_FAILED;
+  if (primary_keys.size() > 0) {
+    string primary_index_name = "PRIMARY";
+    IndexInfo *primary_index_info;
+    if (dbs_[current_db_]->catalog_mgr_->CreateIndex(table_name, primary_index_name, primary_keys, nullptr, primary_index_info)){
+      cout << "ERROR: Primary Key Index create failed" << endl;
+      return DB_FAILED;
+    }
   }
+
 
   //为所有的unique列建立索引
   for ( auto unique_itr = unique_indexes.begin(); unique_itr != unique_indexes.end() ; unique_itr++) {
