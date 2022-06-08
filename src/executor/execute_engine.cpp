@@ -98,9 +98,10 @@ dberr_t ExecuteEngine::ExecuteCreateDatabase(pSyntaxNode ast, ExecuteContext *co
     cout << "ERROR: Database already exist" << endl;
     return DB_FAILED;
   } else {
-  dbs_.emplace(ast->child_->val_, new DBStorageEngine(path + ast->child_->val_ + ".db"));
-  cout << "Create " << ast->child_->val_ << " OK" << endl;
-  return DB_SUCCESS;
+    dbs_.emplace(ast->child_->val_, new DBStorageEngine(path + ast->child_->val_ + ".db"));
+    cout << "Create " << ast->child_->val_ << " OK" << endl;
+    return DB_SUCCESS;
+  }
 }
 
 dberr_t ExecuteEngine::ExecuteDropDatabase(pSyntaxNode ast, ExecuteContext *context) {
