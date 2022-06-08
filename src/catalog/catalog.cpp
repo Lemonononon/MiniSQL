@@ -93,7 +93,6 @@ CatalogManager::CatalogManager(BufferPoolManager *buffer_pool_manager, LockManag
       lock_manager_(lock_manager),
       log_manager_(log_manager),
       heap_(new SimpleMemHeap()) {
-
   if (init) {
     // step1: 实例化一个新的CatalogMeta
     catalog_meta_ = CatalogMeta::NewInstance(heap_);
@@ -103,25 +102,27 @@ CatalogManager::CatalogManager(BufferPoolManager *buffer_pool_manager, LockManag
   } else {
     // step1: 反序列化CatalogMetadata
     Page *meta_data_page = buffer_pool_manager_->FetchPage(CATALOG_META_PAGE_ID);
-//    meta_data_page->RLatch();
+    //    meta_data_page->RLatch();
     catalog_meta_ = CatalogMeta::DeserializeFrom(meta_data_page->GetData(), heap_);
-//    meta_data_page->RUnlatch();
+    //    meta_data_page->RUnlatch();
     // step2: 刷新CatalogManager的几个nextid
     next_table_id_ = catalog_meta_->GetNextTableId();
     next_index_id_ = catalog_meta_->GetNextIndexId();
     // step3: 更新CatalogManager的数据
     // 根据catalogMeta中的数据更新Table和Index
     for (auto table_meta_page_it : catalog_meta_->table_meta_pages_) {
-      ASSERT(LoadTable(table_meta_page_it.first, table_meta_page_it.second)==DB_SUCCESS,"LoadTable Failed!");
+      ASSERT(LoadTable(table_meta_page_it.first, table_meta_page_it.second) == DB_SUCCESS, "LoadTable Failed!");
     }
     for (auto index_meta_page_it : catalog_meta_->index_meta_pages_) {
-      ASSERT(LoadIndex(index_meta_page_it.first, index_meta_page_it.second)==DB_SUCCESS,"LoadIndex Failed");
+      ASSERT(LoadIndex(index_meta_page_it.first, index_meta_page_it.second) == DB_SUCCESS, "LoadIndex Failed");
     }
   }
+  // 将改动刷盘
+  FlushCatalogMetaPage();
 }
 
 CatalogManager::~CatalogManager() {
-  //我不是很清楚什么时候需要Flush,以防万一，现在这里Flush一下
+  // 我不是很清楚什么时候需要Flush,以防万一，现在这里Flush一下
   FlushCatalogMetaPage();
   delete heap_;
 }
@@ -146,10 +147,12 @@ dberr_t CatalogManager::CreateTable(const string &table_name, TableSchema *schem
   page_id_t meta_data_page_id;
   Page *meta_data_page = buffer_pool_manager_->NewPage(meta_data_page_id);
   ASSERT(meta_data_page != nullptr, "Get a nullptr in New a table meta data Page from CreateTable");
-//  meta_data_page->WLatch();
+  //  meta_data_page->WLatch();
   meta_data->SerializeTo(meta_data_page->GetData());
-//  meta_data_page->WUnlatch();
+  //  meta_data_page->WUnlatch();
   catalog_meta_->table_meta_pages_[table_id] = meta_data_page_id;
+  // 将改动刷盘
+  FlushCatalogMetaPage();
   return DB_SUCCESS;
 }
 
@@ -208,11 +211,12 @@ dberr_t CatalogManager::CreateIndex(const std::string &table_name, const string 
   page_id_t meta_data_page_id;
   Page *meta_data_page = buffer_pool_manager_->NewPage(meta_data_page_id);
   ASSERT(meta_data_page != nullptr, "Get a nullptr in New a index meta data Page from CreateIndex");
-//  meta_data_page->WLatch();
+  //  meta_data_page->WLatch();
   meta_data->SerializeTo(meta_data_page->GetData());
-//  meta_data_page->WUnlatch();
+  //  meta_data_page->WUnlatch();
   catalog_meta_->index_meta_pages_[index_id] = meta_data_page_id;
-
+  // 将改动刷盘
+  FlushCatalogMetaPage();
   return DB_SUCCESS;
 }
 
@@ -283,11 +287,12 @@ dberr_t CatalogManager::DropTable(const string &table_name) {
     }
     index_names_.erase(table_name);
   }
-
+  // 将改动刷盘
+  FlushCatalogMetaPage();
   return DB_SUCCESS;
 }
 
-//根据参数删除对应的index
+// 根据参数删除对应的index
 dberr_t CatalogManager::DropIndex(const string &table_name, const string &index_name) {
   // 同DropTable,目前并没有回收index_id以及info占用的内存的打算
   // step1: 查找是否存在table 以及 index
@@ -323,6 +328,8 @@ dberr_t CatalogManager::DropIndex(const string &table_name, const string &index_
       indexes_.erase(index_id);
     }
   }
+  // 将改动刷盘
+  FlushCatalogMetaPage();
   return DB_SUCCESS;
 }
 
@@ -331,9 +338,9 @@ dberr_t CatalogManager::FlushCatalogMetaPage() const {
   // 直接序列化CatalogMetaData到数据页中
   auto catalog_meta_page = buffer_pool_manager_->FetchPage(CATALOG_META_PAGE_ID);
   ASSERT(catalog_meta_page != nullptr, "read catalog_meta_page failed!");
-//  catalog_meta_page->WLatch();
+  //  catalog_meta_page->WLatch();
   catalog_meta_->SerializeTo(catalog_meta_page->GetData());
-//  catalog_meta_page->WUnlatch();
+  //  catalog_meta_page->WUnlatch();
   // 立即将数据转存到磁盘
   buffer_pool_manager_->FlushPage(CATALOG_META_PAGE_ID);
 
@@ -347,10 +354,10 @@ dberr_t CatalogManager::LoadTable(const table_id_t table_id, const page_id_t pag
   ASSERT(meta_data_page != nullptr, "Fetch Tabel_meta_data_page failed!");
   // step2: 新建TableMetaData并反序列化
   TableInfo *table_info = TableInfo::Create(heap_);
-//  meta_data_page->RLatch();
+  //  meta_data_page->RLatch();
   TableMetadata *meta_data;
   TableMetadata::DeserializeFrom(meta_data_page->GetData(), meta_data, table_info->GetMemHeap());
-//  meta_data_page->RUnlatch();
+  //  meta_data_page->RUnlatch();
   ASSERT(table_id == meta_data->GetTableId(), "False Table ID in LoadTable!");
   // step3: 插入table_names_
   table_names_[meta_data->GetTableName()] = table_id;
@@ -371,10 +378,10 @@ dberr_t CatalogManager::LoadIndex(const index_id_t index_id, const page_id_t pag
   ASSERT(meta_data_page != nullptr, "Fetch Tabel_meta_data_page failed!");
   // step2: 新建IndexMetaData并反序列化
   IndexInfo *index_info = IndexInfo::Create(heap_);
-//  meta_data_page->RLatch();
+  //  meta_data_page->RLatch();
   IndexMetadata *meta_data;
   IndexMetadata::DeserializeFrom(meta_data_page->GetData(), meta_data, index_info->GetMemHeap());
-//  meta_data_page->RUnlatch();
+  //  meta_data_page->RUnlatch();
   ASSERT(index_id == meta_data->GetIndexId(), "False Index ID in LoadIndex!");
   // step3: 插入index_names_
   table_id_t table_id = meta_data->GetTableId();
