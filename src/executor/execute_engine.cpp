@@ -9,7 +9,8 @@
 
 bool IsSatisfiedRow(Row *row, SyntaxNode *condition, uint32_t column_index, TypeId column_type);
 string GetFieldString(Field *field, TypeId type);
-vector<RowId> GetSatisfiedRowIds(vector<vector<SyntaxNode*>> conditions, TableInfo* table_info, vector<IndexInfo *> indexes);
+vector<RowId> GetSatisfiedRowIds(vector<vector<SyntaxNode *>> conditions, TableInfo *table_info,
+                                 vector<IndexInfo *> indexes);
 string path = "./db/";
 
 ExecuteEngine::ExecuteEngine() {
@@ -169,9 +170,26 @@ dberr_t ExecuteEngine::ExecuteShowTables(pSyntaxNode ast, ExecuteContext *contex
   if (dbs_[current_db_]->catalog_mgr_->GetTables(tables))
     return DB_FAILED;
   else {
-    for (auto itr = tables.begin(); itr != tables.end(); itr++) {
-      // TODO::外围线框
-      cout << (*itr)->GetTableName() << endl;
+    if (tables.size() == 0) {
+      cout << "empty set" << endl;
+    } else {
+      unsigned long max_length = 5;
+      for (auto table : tables) {
+        if (table->GetTableName().size() > max_length) {
+          max_length = table->GetTableName().size();
+        }
+      }
+      cout << "+-" << setw(max_length) << setfill('-') << "-"
+           << "-+" << endl;
+      cout << "| " << setw(max_length) << setfill(' ') << left << "Table"
+           << " |" << endl;
+      cout << "+-" << setw(max_length) << setfill('-') << "-"
+           << "-+" << endl;
+      for (auto table : tables) {
+        cout << "| " << setw(max_length) << setfill(' ') << left << table->GetTableName() << " |" << endl;
+      }
+      cout << "+-" << setw(max_length) << setfill('-') << "-"
+           << "-+" << endl;
     }
   }
   return DB_SUCCESS;
@@ -244,12 +262,13 @@ dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext *conte
     columns.emplace_back(&(*itr));
   }*/
   // 根据columns创建TableSchema
-//  TableSchema table_schema(columns);
+  //  TableSchema table_schema(columns);
   auto table_schema = new TableSchema(columns);
   //  Transaction *txn{};
   TableInfo *table_info;
   //  xjj TODO:Finish this
-  if (dbs_[current_db_]->catalog_mgr_->CreateTable(table_name, table_schema, nullptr, table_info) == DB_TABLE_ALREADY_EXIST) {
+  if (dbs_[current_db_]->catalog_mgr_->CreateTable(table_name, table_schema, nullptr, table_info) ==
+      DB_TABLE_ALREADY_EXIST) {
     cout << "ERROR: Table name already exist" << endl;
     return DB_FAILED;
   }
@@ -406,10 +425,10 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
   vector<TypeId> column_types;
   // 如果是select * ，那就是所有columns
   if (use_all_columns) {
-    cout << table_info->GetSchema()->GetColumns().size() << endl;
+    //    cout << table_info->GetSchema()->GetColumns().size() << endl;
     for (auto column : table_info->GetSchema()->GetColumns()) {
       columns.emplace_back(column->GetName());
-      cout << column->GetName() << endl;
+      //      cout << column->GetName() << endl;
     }
   }
   // 需要知道要取一个row中哪些field的值，（投影操作），所以需要先得到这些field的index，也就是column_indexes
@@ -437,11 +456,6 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
       table_info->GetTableHeap()->GetTuple(&tmp_row, nullptr);
       result_rows.emplace_back(tmp_row);
     }
-    if (use_all_columns) {
-      for (auto column : table_info->GetSchema()->GetColumns()) {
-        columns.emplace_back(column->GetName());
-      }
-    }
     for (auto column : columns) {
       uint32_t column_index;
       table_info->GetSchema()->GetColumnIndex(column, column_index);
@@ -450,7 +464,7 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
     }
     unsigned long *print_length = new unsigned long[columns.size()];
     for (unsigned long i = 0; i < columns.size(); ++i) {
-      print_length[i] = 0;
+      print_length[i] = columns[i].size();
     }
     // 先统计一下每一列的长度
     for (auto result_row : result_rows) {
@@ -466,49 +480,54 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
     for (unsigned long i = 0; i < columns.size(); ++i) {
       if (i == 0) {
         cout << "+-" << setw(print_length[i]) << setfill('-') << "-"
-             << "-+" << endl;
+             << "-+";
       } else {
         cout << "-" << setw(print_length[i]) << setfill('-') << "-"
-             << "-+" << endl;
+             << "-+";
       }
     }
+    cout << endl;
     for (unsigned long i = 0; i < columns.size(); ++i) {
       if (i == 0) {
-        cout << "| " << setw(print_length[i]) << setfill(' ') << left << columns[i] << " |" << endl;
+        cout << "| " << setw(print_length[i]) << setfill(' ') << left << columns[i] << " |";
       } else {
-        cout << " " << setw(print_length[i]) << setfill(' ') << left << columns[i] << " |" << endl;
+        cout << " " << setw(print_length[i]) << setfill(' ') << left << columns[i] << " |";
       }
     }
+    cout << endl;
     for (unsigned long i = 0; i < columns.size(); ++i) {
       if (i == 0) {
         cout << "+-" << setw(print_length[i]) << setfill('-') << "-"
-             << "-+" << endl;
+             << "-+";
       } else {
         cout << "-" << setw(print_length[i]) << setfill('-') << "-"
-             << "-+" << endl;
+             << "-+";
       }
     }
+    cout << endl;
     // 打印数据
     for (auto result_row : result_rows) {
       for (unsigned long i = 0; i < columns.size(); ++i) {
         if (i == 0) {
           cout << "| " << setw(print_length[i]) << setfill(' ') << left
-               << GetFieldString(result_row.GetField(column_indexes[i]), column_types[i]) << " |" << endl;
+               << GetFieldString(result_row.GetField(column_indexes[i]), column_types[i]) << " |";
         } else {
           cout << " " << setw(print_length[i]) << setfill(' ') << left
-               << GetFieldString(result_row.GetField(column_indexes[i]), column_types[i]) << " |" << endl;
+               << GetFieldString(result_row.GetField(column_indexes[i]), column_types[i]) << " |";
         }
       }
+      cout << endl;
     }
     for (unsigned long i = 0; i < columns.size(); ++i) {
       if (i == 0) {
         cout << "+-" << setw(print_length[i]) << setfill('-') << "-"
-             << "-+" << endl;
+             << "-+";
       } else {
         cout << "-" << setw(print_length[i]) << setfill('-') << "-"
-             << "-+" << endl;
+             << "-+";
       }
     }
+    cout << endl;
     delete[] print_length;
   }
   return DB_SUCCESS;
@@ -528,12 +547,12 @@ dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext *context) {
   get_table_result = dbs_[current_db_]->catalog_mgr_->GetTable(table_name, table_info);
   // 获取TableInfo失败，返回状态
   if (get_table_result != DB_SUCCESS) return get_table_result;
-  cout << table_info->GetTableName() << endl;
+  //  cout << table_info->GetTableName() << endl;
   vector<Field> fields;
   auto columns = table_info->GetSchema()->GetColumns();
-  for (auto column : columns) {
-    cout << column->GetName() << endl;
-  }
+  //  for (auto column : columns) {
+  //    cout << column->GetName() << endl;
+  //  }
   // 第一个value
   auto val_node = ast->child_->next_->child_;
   // 遍历以获取每个field的类型，如果语法树value的结点不够，则报错
@@ -544,11 +563,10 @@ dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext *context) {
       return DB_FAILED;
     }
     uint32_t type = (*itr)->GetType();
-    cout << "column type: " << type << endl;
-    cout << val_node->val_ << endl;
+    //    cout << "column type: " << type << endl;
+    //    cout << val_node->val_ << endl;
     // int
     if (type == kTypeInt) {
-      cout << atoi(val_node->val_) << endl;
       fields.emplace_back(Field(kTypeInt, atoi(val_node->val_)));
     }
     // float
@@ -565,7 +583,6 @@ dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext *context) {
 
   Row row(fields);
   // 插入数据
-  cout << "Inserting..." << endl;
   table_info->GetTableHeap()->InsertTuple(row, nullptr);
   dbs_[current_db_]->bpm_->FlushAllPages();
   return DB_SUCCESS;
@@ -586,7 +603,7 @@ dberr_t ExecuteEngine::ExecuteDelete(pSyntaxNode ast, ExecuteContext *context) {
     cout << "ERROR: Table not exist" << endl;
     return DB_FAILED;
   }
-  TableHeap * table_heap = table_info->GetTableHeap();
+  TableHeap *table_heap = table_info->GetTableHeap();
   /*if (!ast->next_){
     for(auto itr=table_heap->Begin(nullptr);itr!=table_heap->End();itr++){
           table_heap->ApplyDelete(itr->GetRowId(), nullptr);
@@ -614,31 +631,30 @@ dberr_t ExecuteEngine::ExecuteDelete(pSyntaxNode ast, ExecuteContext *context) {
       for(uint32_t i=0;i<results.size();i++){
         table_heap->ApplyDelete(results[i], nullptr);
       }*/
-    if(ast->next_) {
-      ast = ast->next_->child_;
-      while (ast->type_ == kNodeConnector) {
-        now_condition.emplace_back(ast->child_->next_);
-        string connector = ast->val_;
-        if (connector == "or") {
-          conditions.emplace_back(now_condition);
-          now_condition.clear();
-        }
-        ast = ast->child_;
+  if (ast->next_) {
+    ast = ast->next_->child_;
+    while (ast->type_ == kNodeConnector) {
+      now_condition.emplace_back(ast->child_->next_);
+      string connector = ast->val_;
+      if (connector == "or") {
+        conditions.emplace_back(now_condition);
+        now_condition.clear();
       }
-      now_condition.emplace_back(ast);
-      conditions.emplace_back(now_condition);
-      now_condition.clear();
+      ast = ast->child_;
     }
-    // 利用conditions进行查询
-    vector<IndexInfo *> indexes;
-    vector<RowId> results = GetSatisfiedRowIds(conditions, table_info,indexes);
-    for(uint32_t i=0;i<results.size();i++){
-      table_heap->ApplyDelete(results[i], nullptr);
-    }
-    cout<<"Query OK, "<< results.size()<<" rows affected"<<endl;
-    return DB_SUCCESS;
+    now_condition.emplace_back(ast);
+    conditions.emplace_back(now_condition);
+    now_condition.clear();
   }
-
+  // 利用conditions进行查询
+  vector<IndexInfo *> indexes;
+  vector<RowId> results = GetSatisfiedRowIds(conditions, table_info, indexes);
+  for (uint32_t i = 0; i < results.size(); i++) {
+    table_heap->ApplyDelete(results[i], nullptr);
+  }
+  cout << "Query OK, " << results.size() << " rows affected" << endl;
+  return DB_SUCCESS;
+}
 
 dberr_t ExecuteEngine::ExecuteUpdate(pSyntaxNode ast, ExecuteContext *context) {
 #ifdef ENABLE_EXECUTE_DEBUG
@@ -823,7 +839,8 @@ string GetFieldString(Field *field, TypeId type) {
   }
 }
 
-vector<RowId> GetSatisfiedRowIds(vector<vector<SyntaxNode*>> conditions, TableInfo* table_info, vector<IndexInfo *> indexes) {
+vector<RowId> GetSatisfiedRowIds(vector<vector<SyntaxNode *>> conditions, TableInfo *table_info,
+                                 vector<IndexInfo *> indexes) {
   vector<RowId> result;
   if (conditions.size() == 0) {
     auto table_iter = table_info->GetTableHeap()->Begin(nullptr);
