@@ -244,11 +244,12 @@ dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext *conte
     columns.emplace_back(&(*itr));
   }*/
   // 根据columns创建TableSchema
-  TableSchema table_schema(columns);
+//  TableSchema table_schema(columns);
+  auto table_schema = new TableSchema(columns);
   //  Transaction *txn{};
   TableInfo *table_info;
   //  xjj TODO:Finish this
-  if (dbs_[current_db_]->catalog_mgr_->CreateTable(table_name, &table_schema, nullptr, table_info) == DB_TABLE_ALREADY_EXIST) {
+  if (dbs_[current_db_]->catalog_mgr_->CreateTable(table_name, table_schema, nullptr, table_info) == DB_TABLE_ALREADY_EXIST) {
     cout << "ERROR: Table name already exist" << endl;
     return DB_FAILED;
   }

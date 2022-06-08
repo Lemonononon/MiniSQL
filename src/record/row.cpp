@@ -11,7 +11,8 @@ uint32_t Row::SerializeTo(char *buf, Schema *schema) const {
   }
   uint32_t ofs = 0;
   // write fields num
-  MACH_WRITE_UINT32(buf, fields_.size());
+  uint32_t fields_num = fields_.size();
+  MACH_WRITE_UINT32(buf, fields_num);
   ofs += 4;
   buf += 4;
   // write null bitmap

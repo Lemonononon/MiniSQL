@@ -117,7 +117,11 @@ private:
             first_page_id_(first_page_id),
             schema_(schema),
             log_manager_(log_manager),
-            lock_manager_(lock_manager) {}
+            lock_manager_(lock_manager) {
+    auto page = reinterpret_cast<TablePage *>(buffer_pool_manager->FetchPage(first_page_id));
+    page->Init(first_page_id, INVALID_PAGE_ID, log_manager, nullptr);
+    buffer_pool_manager->UnpinPage(first_page_id, true);
+  }
 
 private:
   BufferPoolManager *buffer_pool_manager_;
