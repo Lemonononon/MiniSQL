@@ -304,8 +304,16 @@ dberr_t ExecuteEngine::ExecuteDropTable(pSyntaxNode ast, ExecuteContext *context
     return DB_FAILED;
   }
   string table_name = ast->child_->val_;
-  if (dbs_[current_db_]->catalog_mgr_->DropTable(table_name)) return DB_FAILED;
-  return DB_SUCCESS;
+  switch (dbs_[current_db_]->catalog_mgr_->DropTable(table_name)) {
+    case DB_FAILED:
+      cout << "ERROR: Table still used" << endl;
+      return DB_FAILED;
+    case DB_TABLE_NOT_EXIST:
+      cout << "ERROR: Table not exist" << endl;
+      return DB_FAILED;
+    default:
+      return DB_SUCCESS;
+  }
 }
 
 dberr_t ExecuteEngine::ExecuteShowIndexes(pSyntaxNode ast, ExecuteContext *context) {
@@ -374,7 +382,7 @@ dberr_t ExecuteEngine::ExecuteCreateIndex(pSyntaxNode ast, ExecuteContext *conte
   ast = ast->child_;
   string table_name = ast->next_->val_;
   ast = ast->next_;
-  ASSERT(ast->next_->type_ == kNodeColumnList, "EXECUTE ERROR: Index keys not found");
+  ASSERT(ast->next_->type_ == kNodeColumnList, "ERROR: Index keys not found");
   ast = ast->next_;
   auto first_index_key_node = ast->child_;
   auto index_key_node = first_index_key_node;
@@ -383,42 +391,64 @@ dberr_t ExecuteEngine::ExecuteCreateIndex(pSyntaxNode ast, ExecuteContext *conte
     index_keys.emplace_back(index_key_node->val_);
     index_key_node = index_key_node->next_;
   }
+  // 记录是否存在unique键，只有索引列中有一个是unique的，才可以建立索引
+  bool is_unique = false;
+  TableInfo* table_info;
+  if (dbs_[current_db_]->catalog_mgr_->GetTable(table_name, table_info) == DB_TABLE_NOT_EXIST) {
+    cout << "ERROR: Table not exist" << endl;
+    return DB_FAILED;
+  }
+  for (auto index_key : index_keys) {
+    uint32_t tmp_column_index;
+    if (table_info->GetSchema()->GetColumnIndex(index_key, tmp_column_index) == DB_COLUMN_NAME_NOT_EXIST) {
+      cout << "ERROR: Column not exist" << endl;
+      return DB_FAILED;
+    }
+    if (table_info->GetSchema()->GetColumn(tmp_column_index)->IsUnique()) {
+      is_unique = true;
+      break;
+    }
+  }
+  if (!is_unique) {
+    cout << "ERROR: Only when contains a unique column can you build index" << endl;
+    return DB_FAILED;
+  }
   if (ast->next_) {
-    ASSERT(ast->next_->type_ == kNodeIndexType, "EXECUTE ERROR: Unexpected syntax node");
+    ASSERT(ast->next_->type_ == kNodeIndexType, "ERROR: Unexpected syntax node");
     ast = ast->next_;
     string index_type = ast->child_->val_;
     transform(index_type.begin(), index_type.end(), index_type.begin(), ::tolower);
-    if (index_type == "bptree") {
-      // TODO: 这里目前并没有index的type入参，默认只有bplustree
-      IndexInfo *tmp_index_info;
-      dbs_[current_db_]->catalog_mgr_->CreateIndex(table_name, index_name, index_keys, nullptr, tmp_index_info);
-      TableInfo *tmp_table_info;
-      dbs_[current_db_]->catalog_mgr_->GetTable(table_name, tmp_table_info);
-      uint32_t *column_index = new uint32_t[index_keys.size()];
-      for (unsigned long i = 0; i < index_keys.size(); ++i) {
-        tmp_table_info->GetSchema()->GetColumnIndex(index_keys[i], column_index[i]);
+    if (index_type != "bptree") {
+      if (index_type == "hash") {
+        cout << "Not supported yet" << endl;
+        return DB_FAILED;
+      } else {
+        cout << "Please choose (bptree/hash) index" << endl;
+        return DB_FAILED;
       }
-      auto table_iter = tmp_table_info->GetTableHeap()->Begin(nullptr);
-      for (; table_iter != tmp_table_info->GetTableHeap()->End(); ++table_iter) {
-        // 遍历整个表，对每一行都取出响应Index keys插入索引
-        vector<Field> fields;
-        for (unsigned long i = 0; i < index_keys.size(); ++i) {
-          fields.emplace_back(*(table_iter->GetField(column_index[i])));
-        }
-        Row tmp_row(fields);
-        tmp_index_info->GetIndex()->InsertEntry(tmp_row, table_iter->GetRowId(), nullptr);
-      }
-      delete[] column_index;
-      cout << "Create bptree index " << index_name << " OK" << endl;
-    } else if (index_type == "hash") {
-      // TODO: create hash index
-      cout << "Not supported yet" << endl;
-      // cout << "Create hash index " << index_name << " OK" << endl;
-    } else {
-      cout << "Please choose (bptree/hash) index" << endl;
     }
   }
-
+  IndexInfo *tmp_index_info;
+  dbs_[current_db_]->catalog_mgr_->CreateIndex(table_name, index_name, index_keys, nullptr, tmp_index_info);
+  TableInfo *tmp_table_info;
+  dbs_[current_db_]->catalog_mgr_->GetTable(table_name, tmp_table_info);
+  uint32_t *column_index = new uint32_t[index_keys.size()];
+  for (unsigned long i = 0; i < index_keys.size(); ++i) {
+    tmp_table_info->GetSchema()->GetColumnIndex(index_keys[i], column_index[i]);
+  }
+  auto table_iter = tmp_table_info->GetTableHeap()->Begin(nullptr);
+  for (; table_iter != tmp_table_info->GetTableHeap()->End(); ++table_iter) {
+    // 遍历整个表，对每一行都取出响应Index keys插入索引
+    vector<Field> fields;
+    for (unsigned long i = 0; i < index_keys.size(); ++i) {
+      fields.emplace_back(*(table_iter->GetField(column_index[i])));
+    }
+    Row tmp_row(fields);
+    tmp_index_info->GetIndex()->InsertEntry(tmp_row, table_iter->GetRowId(), nullptr);
+  }
+  delete[] column_index;
+  cout << "Create bptree index " << index_name << " OK" << endl;
+  dbs_[current_db_]->bpm_->FlushAllPages();
   return DB_SUCCESS;
 }
 
@@ -505,6 +535,7 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
   }
   vector<IndexInfo *> indexes;
   dbs_[current_db_]->catalog_mgr_->GetTableIndexes(table_name, indexes);
+  cout << "We have " << indexes.size() << " indexes" << endl;
   auto result = GetSatisfiedRowIds(conditions, table_info, indexes);
   if (result.size() == 0) {
     cout << "empty set" << endl;
@@ -958,6 +989,7 @@ vector<RowId> GetSatisfiedRowIds(vector<vector<SyntaxNode *>> conditions, TableI
       }
     }
     if (use_index && chosed_index != nullptr) {
+      cout << "Use index " << chosed_index->GetIndexName() << endl;
       // 单个condition
       // 用索引进行查找
       // int key_length = chosed_index->GetKeyLength();
@@ -1016,6 +1048,7 @@ vector<RowId> GetSatisfiedRowIds(vector<vector<SyntaxNode *>> conditions, TableI
         }
       }
     } else {
+      cout << "Scan through the whole table" << endl;
       // 可能有多个condition（指or相连的）
       // 全表扫描，符合的加进result
       auto tmp_table_iter = table_info->GetTableHeap()->Begin(nullptr);
