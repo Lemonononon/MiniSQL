@@ -307,7 +307,49 @@ dberr_t ExecuteEngine::ExecuteShowIndexes(pSyntaxNode ast, ExecuteContext *conte
     cout << "ERROR: No current database" << endl;
     return DB_FAILED;
   }
-  return DB_FAILED;
+
+  //获取所有的表
+  std::vector<TableInfo *> tables;
+  if (dbs_[current_db_]->catalog_mgr_->GetTables(tables))
+    return DB_FAILED;
+
+  //没有表，结束
+  if (tables.empty()){
+    cout << "empty set" << endl;
+    return DB_SUCCESS;
+  }
+
+  std::vector<IndexInfo *> indexes;
+  std::vector<IndexInfo *> tmp_indexes;
+  for ( auto itr = tables.begin(); itr != tables.end(); itr++) {
+    if ( dbs_[current_db_]->catalog_mgr_->GetTableIndexes(current_db_, tmp_indexes) != DB_SUCCESS) return DB_FAILED;
+    //insert效率会低? 不过一般index较少，影响不大
+    indexes.insert(indexes.end(), tmp_indexes.begin(), tmp_indexes.end());
+  }
+
+  if (indexes.empty()) {
+    cout << "empty set" <<endl;
+    return DB_SUCCESS;
+  }else {
+    int32_t max_length = 5;
+    for (auto index : indexes) {
+      if (index->GetKeyLength() > max_length)
+        max_length = index->GetKeyLength();
+      }
+    cout << "+-" << setw(max_length) << setfill('-') << "-"
+         << "-+" << endl;
+    cout << "| " << setw(max_length) << setfill(' ') << left << "Index"
+         << " |" << endl;
+    cout << "+-" << setw(max_length) << setfill('-') << "-"
+         << "-+" << endl;
+    for (auto index : indexes) {
+      cout << "| " << setw(max_length) << setfill(' ') << left << index->GetIndexName() << " |" << endl;
+    }
+    cout << "+-" << setw(max_length) << setfill('-') << "-"
+         << "-+" << endl;
+  }
+
+  return DB_SUCCESS;
 }
 
 dberr_t ExecuteEngine::ExecuteCreateIndex(pSyntaxNode ast, ExecuteContext *context) {
