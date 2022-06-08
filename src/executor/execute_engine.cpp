@@ -234,7 +234,7 @@ dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext *conte
     if (column_type == "char") {
       uint32_t column_length = atoi(node->child_->next_->child_->val_);
       // Column column(column_name, kTypeChar, column_length, flag_nullable, flag_unique);
-      auto column = new Column(column_name, kTypeChar, column_length, flag_nullable, flag_unique);
+      auto column = new Column(column_name, kTypeChar, column_length, column_index, flag_nullable, flag_unique);
       columns.emplace_back(column);
     } else if (column_type == "int") {
       // Column column(column_name, kTypeInt, column_index++, flag_nullable, flag_unique);
@@ -304,6 +304,7 @@ dberr_t ExecuteEngine::ExecuteCreateIndex(pSyntaxNode ast, ExecuteContext *conte
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteCreateIndex" << std::endl;
 #endif
+  // TODO: 只有unique的可以创建index
   if (dbs_.find(current_db_) == dbs_.end()) {
     cout << "ERROR: No current database" << endl;
     return DB_FAILED;
