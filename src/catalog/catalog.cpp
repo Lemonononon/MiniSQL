@@ -116,6 +116,7 @@ CatalogManager::CatalogManager(BufferPoolManager *buffer_pool_manager, LockManag
     for (auto index_meta_page_it : catalog_meta_->index_meta_pages_) {
       ASSERT(LoadIndex(index_meta_page_it.first, index_meta_page_it.second) == DB_SUCCESS, "LoadIndex Failed");
     }
+    buffer_pool_manager_->UnpinPage(CATALOG_META_PAGE_ID, false);
   }
   // 将改动刷盘
   FlushCatalogMetaPage();
@@ -342,6 +343,7 @@ dberr_t CatalogManager::FlushCatalogMetaPage() const {
   catalog_meta_->SerializeTo(catalog_meta_page->GetData());
   //  catalog_meta_page->WUnlatch();
   // 立即将数据转存到磁盘
+  buffer_pool_manager_->UnpinPage(CATALOG_META_PAGE_ID, true);
   buffer_pool_manager_->FlushPage(CATALOG_META_PAGE_ID);
 
   return DB_SUCCESS;

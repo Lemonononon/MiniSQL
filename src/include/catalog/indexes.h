@@ -117,11 +117,12 @@ class IndexInfo {
 
   // 直接根据key的Length新建index,index会自动从磁盘中读取对应index_id的数据
   Index *CreateIndex(BufferPoolManager *buffer_pool_manager) {
-    // TODO: 将keyLength用锁男公式计算
     uint32_t keyLength = 0;
     for (auto column_it : key_schema_->GetColumns()) {
       keyLength += column_it->GetLength();
     }
+    // 这是一个Row中的header的长度，因为索引键是用Row存的，所以需要header
+    keyLength += 4 + (uint32_t)ceil((double)key_schema_->GetColumnCount() / 8);
     ASSERT(keyLength <= 128, "WARNING: GenericKey is not big enough. From indexes.h:CreateIndex");
     if (keyLength <= 4) {
       meta_data_->keyLength = 4;

@@ -23,6 +23,7 @@ BPLUSTREE_TYPE::BPlusTree(index_id_t index_id, BufferPoolManager *buffer_pool_ma
     root_page_id_ = *root_page_id_receiver;
   }
   delete root_page_id_receiver;
+  buffer_pool_manager->UnpinPage(INDEX_ROOTS_PAGE_ID, false);
 }
 
 INDEX_TEMPLATE_ARGUMENTS
