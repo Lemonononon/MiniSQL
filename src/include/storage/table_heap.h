@@ -11,6 +11,7 @@ class TableHeap {
   friend class TableIterator;
 
 public:
+ //该构造函数会自动创建first_page并init
   static TableHeap *Create(BufferPoolManager *buffer_pool_manager, Schema *schema, Transaction *txn,
                            LogManager *log_manager, LockManager *lock_manager, MemHeap *heap) {
     void *buf = heap->Allocate(sizeof(TableHeap));
@@ -117,11 +118,7 @@ private:
             first_page_id_(first_page_id),
             schema_(schema),
             log_manager_(log_manager),
-            lock_manager_(lock_manager) {
-    auto page = reinterpret_cast<TablePage *>(buffer_pool_manager->FetchPage(first_page_id));
-    page->Init(first_page_id, INVALID_PAGE_ID, log_manager, nullptr);
-    buffer_pool_manager->UnpinPage(first_page_id, true);
-  }
+            lock_manager_(lock_manager) {}
 
 private:
   BufferPoolManager *buffer_pool_manager_;

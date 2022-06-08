@@ -134,12 +134,10 @@ dberr_t CatalogManager::CreateTable(const string &table_name, TableSchema *schem
   // step2: 新建TableInfo,TableMetaData,TableHeap
   table_info = TableInfo::Create(heap_);
   table_id_t table_id = next_table_id_++;
-  page_id_t table_page;
-  ASSERT(buffer_pool_manager_->NewPage(table_page) != nullptr, "Get a nullptr in New a table Page from CreateTable");
-  TableHeap *table_heap = TableHeap::Create(buffer_pool_manager_, table_page, schema, log_manager_, lock_manager_,
+  TableHeap *table_heap = TableHeap::Create(buffer_pool_manager_, schema, nullptr, log_manager_, lock_manager_,
                                             table_info->GetMemHeap());
   // 这里直接拿了table_heap的FirstPageId,但是这个table_heap
-  TableMetadata *meta_data = TableMetadata::Create(table_id, table_name, table_page, schema, table_info->GetMemHeap());
+  TableMetadata *meta_data = TableMetadata::Create(table_id, table_name, table_heap->GetFirstPageId(), schema, table_info->GetMemHeap());
   table_info->Init(meta_data, table_heap);
   // step3: 更新CatalogManager和CatalogMetaData
   table_names_[table_name] = table_id;
