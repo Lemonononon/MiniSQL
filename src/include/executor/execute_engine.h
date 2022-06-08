@@ -19,6 +19,7 @@ int yyparse(void);
  * eg: transaction info, execute result...
  */
 struct ExecuteContext {
+  int related_row_num_{0};
   bool flag_quit_{false};
   Transaction *txn_{nullptr};
 };

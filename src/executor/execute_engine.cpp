@@ -546,6 +546,7 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
     cout << "empty set" << endl;
     return DB_SUCCESS;
   } else {
+    context->related_row_num_ = result.size();
     // 打印result
     vector<Row> result_rows;
     // 需要知道要取一个row中哪些field的值，（投影操作），所以需要先得到这些field的index，也就是column_indexes
