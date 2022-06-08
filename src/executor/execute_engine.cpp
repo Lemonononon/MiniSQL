@@ -211,19 +211,25 @@ dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext *conte
   auto node = ast->child_->next_->child_;
   uint32_t column_index = 0;
 
+  //记录哪些列需要建立unique index
+  vector<vector<string>> unique_indexes;
   // 记录所有的column对象，后续需要所有column对象的指针来创建TableSchema
   // vector<Column> columns_list;
   while (node && node->type_ != kNodeColumnList) {
     // column默认是可以为空，不unique的
     bool flag_nullable = true;
     bool flag_unique = false;
-    // primary key, unique 等约束条件
+    // 约束条件
+
     string constraint;
     if (node->val_) {
       constraint = node->val_;
       // 如果是unique，只需要将Column中的unique_置为true
       if (constraint == "unique") {
         flag_unique = true;
+        vector<string> v;
+        v.emplace_back(string(node->child_->val_));
+        unique_indexes.emplace_back(v);
       }
       // 暂不支持not null
     }
@@ -248,7 +254,18 @@ dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext *conte
     }
     node = node->next_;
   }
-  // TODO: 处理末尾的primary key, 猜测是通过为主键建立索引以保证其唯一性，插入重复数据时会出错
+
+  //  TableSchema table_schema(columns);
+  auto table_schema = new TableSchema(columns);
+  //  Transaction *txn{};
+  TableInfo *table_info;
+  // 建表
+  if (dbs_[current_db_]->catalog_mgr_->CreateTable(table_name, table_schema, nullptr, table_info) ==
+      DB_TABLE_ALREADY_EXIST) {
+    cout << "ERROR: Table name already exist" << endl;
+    return DB_FAILED;
+  }
+  // 处理末尾的primary key, 为主键建立索引
   vector<string> primary_keys;
   if (node) {
     auto primary_key_node = node->child_;
@@ -257,23 +274,23 @@ dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext *conte
       primary_key_node = primary_key_node->next_;
     }
   }
-  // TODO: 为主键建立索引
-
-  /*for (auto itr = columns_list.begin(); itr != columns_list.end(); ++itr) {
-    columns.emplace_back(&(*itr));
-  }*/
-  // 根据columns创建TableSchema
-
-  //  TableSchema table_schema(columns);
-  auto table_schema = new TableSchema(columns);
-  //  Transaction *txn{};
-  TableInfo *table_info;
-  //  xjj TODO:Finish this
-  if (dbs_[current_db_]->catalog_mgr_->CreateTable(table_name, table_schema, nullptr, table_info) ==
-      DB_TABLE_ALREADY_EXIST) {
-    cout << "ERROR: Table name already exist" << endl;
+  string primary_index_name = "PRIMARY";
+  IndexInfo *primary_index_info;
+  if (dbs_[current_db_]->catalog_mgr_->CreateIndex(table_name, primary_index_name, primary_keys, nullptr, primary_index_info)){
+//    cout << "Primary Key Index already exist" << endl;
     return DB_FAILED;
   }
+
+  //为所有的unique列建立索引
+  for ( auto unique_itr = unique_indexes.begin(); unique_itr != unique_indexes.end() ; unique_itr++) {
+    string unique_index_name = (*unique_itr)[0];
+    IndexInfo *unique_index_info;
+    if (dbs_[current_db_]->catalog_mgr_->CreateIndex(table_name, unique_index_name, *unique_itr, nullptr, unique_index_info)){
+      cout << "Create unique index on " << unique_index_name << "failed" << endl;
+      return DB_FAILED;
+    }
+  }
+
   dbs_[current_db_]->bpm_->FlushAllPages();
   return DB_SUCCESS;
 }
