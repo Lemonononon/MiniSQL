@@ -174,6 +174,7 @@ dberr_t ExecuteEngine::ExecuteShowTables(pSyntaxNode ast, ExecuteContext *contex
       cout << (*itr)->GetTableName() << endl;
     }
   }
+
   return DB_SUCCESS;
 }
 
@@ -244,11 +245,11 @@ dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext *conte
     columns.emplace_back(&(*itr));
   }*/
   // 根据columns创建TableSchema
-  TableSchema table_schema(columns);
+  TableSchema* table_schema= new TableSchema(columns);
   //  Transaction *txn{};
   TableInfo *table_info;
   //  xjj TODO:Finish this
-  if (dbs_[current_db_]->catalog_mgr_->CreateTable(table_name, &table_schema, nullptr, table_info) == DB_TABLE_ALREADY_EXIST) {
+  if (dbs_[current_db_]->catalog_mgr_->CreateTable(table_name, table_schema, nullptr, table_info) == DB_TABLE_ALREADY_EXIST) {
     cout << "ERROR: Table name already exist" << endl;
     return DB_FAILED;
   }
@@ -586,33 +587,6 @@ dberr_t ExecuteEngine::ExecuteDelete(pSyntaxNode ast, ExecuteContext *context) {
     return DB_FAILED;
   }
   TableHeap * table_heap = table_info->GetTableHeap();
-  /*if (!ast->next_){
-    for(auto itr=table_heap->Begin(nullptr);itr!=table_heap->End();itr++){
-          table_heap->ApplyDelete(itr->GetRowId(), nullptr);
-    }
-    // TODO:刷盘，但是每次删除就刷的话会不会开销太大？
-  }
-  else{
-    // 获取condition
-      ast = ast->next_->child_;
-      while (ast->type_ == kNodeConnector) {
-        now_condition.emplace_back(ast->child_->next_);
-        string connector = ast->val_;
-        if (connector == "or") {
-          conditions.emplace_back(now_condition);
-          now_condition.clear();
-        }
-        ast = ast->child_;
-      }
-      now_condition.emplace_back(ast);
-      conditions.emplace_back(now_condition);
-      now_condition.clear();
-      // 利用conditions进行查询
-      vector<IndexInfo *> indexes;
-      vector<RowId> results = GetSatisfiedRowIds(conditions, table_info,indexes);
-      for(uint32_t i=0;i<results.size();i++){
-        table_heap->ApplyDelete(results[i], nullptr);
-      }*/
     if(ast->next_) {
       ast = ast->next_->child_;
       while (ast->type_ == kNodeConnector) {
@@ -633,6 +607,7 @@ dberr_t ExecuteEngine::ExecuteDelete(pSyntaxNode ast, ExecuteContext *context) {
     vector<RowId> results = GetSatisfiedRowIds(conditions, table_info,indexes);
     for(uint32_t i=0;i<results.size();i++){
       table_heap->ApplyDelete(results[i], nullptr);
+      dbs_[current_db_]->bpm_->FlushAllPages();
     }
     cout<<"Query OK, "<< results.size()<<" rows affected"<<endl;
     return DB_SUCCESS;
@@ -747,6 +722,7 @@ bool IsSatisfiedRow(Row *row, SyntaxNode *condition, uint32_t column_index, Type
     if (column_type == TypeId::kTypeInt) {
       auto tmp_field = Field(column_type, stoi(condition->child_->next_->val_));
       if (row->GetField(column_index)->CompareGreaterThan(tmp_field) == CmpBool::kFalse) {
+
         is_satisfied = false;
       }
     } else if (column_type == TypeId::kTypeChar) {
