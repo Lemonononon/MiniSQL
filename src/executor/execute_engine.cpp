@@ -242,8 +242,7 @@ dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext *conte
     }
     string column_name = node->child_->val_;
     string column_type = node->child_->next_->val_;
-    // uint32_t length;
-    //    Column column_list = new Column*[];
+
     // int, float, char
     if (column_type == "char") {
       uint32_t column_length = atoi(node->child_->next_->child_->val_);
@@ -652,12 +651,8 @@ dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext *context) {
   get_table_result = dbs_[current_db_]->catalog_mgr_->GetTable(table_name, table_info);
   // 获取TableInfo失败，返回状态
   if (get_table_result != DB_SUCCESS) return get_table_result;
-  //  cout << table_info->GetTableName() << endl;
   vector<Field> fields;
   auto columns = table_info->GetSchema()->GetColumns();
-  //  for (auto column : columns) {
-  //    cout << column->GetName() << endl;
-  //  }
   // 第一个value
   auto val_node = ast->child_->next_->child_;
   // 遍历以获取每个field的类型，如果语法树value的结点不够，则报错
@@ -667,9 +662,18 @@ dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext *context) {
       cout << "wrong insert format!" << endl;
       return DB_FAILED;
     }
+    //约束性的判断，unique和primary都需要满足唯一、非空（不是null）
+    // TODO:似乎并没有办法获取表里是否有主键，以及主键的组成
+    if ((*itr)->IsUnique()){
+      if (string(val_node->val_) == "null"){
+        cout << "can not insert null to unique column"<< endl;
+        context->related_row_num_ = 0;
+        return DB_FAILED;
+      }
+      //TODO:判断唯一性，去索引里面查找
+    }
+
     uint32_t type = (*itr)->GetType();
-    //    cout << "column type: " << type << endl;
-    //    cout << val_node->val_ << endl;
     // int
     if (type == kTypeInt) {
       fields.emplace_back(Field(kTypeInt, atoi(val_node->val_)));
@@ -684,11 +688,12 @@ dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext *context) {
     }
     val_node = val_node->next_;
   }
-  //  int field_type = table_info->GetSchema()->GetColumn()->GetType()
 
   Row row(fields);
   // 插入数据
   table_info->GetTableHeap()->InsertTuple(row, nullptr);
+  //TODO:更新索引
+
   dbs_[current_db_]->bpm_->FlushAllPages();
   return DB_SUCCESS;
 }
