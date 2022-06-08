@@ -26,6 +26,8 @@ public:
 
   bool IsNullable() const { return nullable_; }
 
+  bool IsUnique() const { return unique_; }
+
   TypeId GetType() const { return type_; }
 
   uint32_t SerializeTo(char *buf) const;

@@ -59,7 +59,13 @@ public:
     Row rhs_key(INVALID_ROWID);
     lhs.DeserializeToKey(lhs_key, key_schema_);
     rhs.DeserializeToKey(rhs_key, key_schema_);
-
+    // beet：防止反序列化出空的row导致错误
+    if (lhs_key.GetFields().size() != rhs_key.GetFields().size()) {
+      return -1;
+    }
+    if (lhs_key.GetFields().size() == 0) {
+      return 0;
+    }
     for (int i = 0; i < column_count; i++) {
       Field *lhs_value = lhs_key.GetField(i);
       Field *rhs_value = rhs_key.GetField(i);

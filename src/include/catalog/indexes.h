@@ -121,6 +121,8 @@ class IndexInfo {
     for (auto column_it : key_schema_->GetColumns()) {
       keyLength += column_it->GetLength();
     }
+    // 这是一个Row中的header的长度，因为索引键是用Row存的，所以需要header
+    keyLength += 4 + (uint32_t)ceil((double)key_schema_->GetColumnCount() / 8);
     ASSERT(keyLength <= 128, "WARNING: GenericKey is not big enough. From indexes.h:CreateIndex");
     if (keyLength <= 4) {
       meta_data_->keyLength = 4;
@@ -143,8 +145,8 @@ class IndexInfo {
       return new BPlusTreeIndex<GenericKey<64>, RowId, GenericComparator<64>>
           (meta_data_->GetIndexId(), key_schema_,buffer_pool_manager);
     } else {
-      meta_data_->keyLength = 64;
-      return new BPlusTreeIndex<GenericKey<64>, RowId, GenericComparator<64>>
+      meta_data_->keyLength = 128;
+      return new BPlusTreeIndex<GenericKey<128>, RowId, GenericComparator<128>>
           (meta_data_->GetIndexId(), key_schema_,buffer_pool_manager);
     }
   }

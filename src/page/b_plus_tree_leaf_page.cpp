@@ -236,3 +236,5 @@ template class BPlusTreeLeafPage<GenericKey<16>, RowId, GenericComparator<16>>;
 template class BPlusTreeLeafPage<GenericKey<32>, RowId, GenericComparator<32>>;
 
 template class BPlusTreeLeafPage<GenericKey<64>, RowId, GenericComparator<64>>;
+
+template class BPlusTreeLeafPage<GenericKey<128>, RowId, GenericComparator<128>>;

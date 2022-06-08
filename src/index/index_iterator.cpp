@@ -87,3 +87,6 @@ class IndexIterator<GenericKey<32>, RowId, GenericComparator<32>>;
 
 template
 class IndexIterator<GenericKey<64>, RowId, GenericComparator<64>>;
+
+template
+class IndexIterator<GenericKey<128>, RowId, GenericComparator<128>>;

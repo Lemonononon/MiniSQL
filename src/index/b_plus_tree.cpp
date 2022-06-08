@@ -23,6 +23,7 @@ BPLUSTREE_TYPE::BPlusTree(index_id_t index_id, BufferPoolManager *buffer_pool_ma
     root_page_id_ = *root_page_id_receiver;
   }
   delete root_page_id_receiver;
+  buffer_pool_manager->UnpinPage(INDEX_ROOTS_PAGE_ID, false);
 }
 
 INDEX_TEMPLATE_ARGUMENTS
@@ -658,3 +659,5 @@ template class BPlusTree<GenericKey<16>, RowId, GenericComparator<16>>;
 template class BPlusTree<GenericKey<32>, RowId, GenericComparator<32>>;
 
 template class BPlusTree<GenericKey<64>, RowId, GenericComparator<64>>;
+
+template class BPlusTree<GenericKey<128>, RowId, GenericComparator<128>>;
