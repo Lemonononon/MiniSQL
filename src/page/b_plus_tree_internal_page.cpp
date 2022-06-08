@@ -295,3 +295,5 @@ template class BPlusTreeInternalPage<GenericKey<16>, page_id_t, GenericComparato
 template class BPlusTreeInternalPage<GenericKey<32>, page_id_t, GenericComparator<32>>;
 
 template class BPlusTreeInternalPage<GenericKey<64>, page_id_t, GenericComparator<64>>;
+
+template class BPlusTreeInternalPage<GenericKey<128>, page_id_t, GenericComparator<128>>;

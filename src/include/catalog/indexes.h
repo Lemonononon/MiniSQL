@@ -117,6 +117,7 @@ class IndexInfo {
 
   // 直接根据key的Length新建index,index会自动从磁盘中读取对应index_id的数据
   Index *CreateIndex(BufferPoolManager *buffer_pool_manager) {
+    // TODO: 将keyLength用锁男公式计算
     uint32_t keyLength = 0;
     for (auto column_it : key_schema_->GetColumns()) {
       keyLength += column_it->GetLength();
@@ -143,8 +144,8 @@ class IndexInfo {
       return new BPlusTreeIndex<GenericKey<64>, RowId, GenericComparator<64>>
           (meta_data_->GetIndexId(), key_schema_,buffer_pool_manager);
     } else {
-      meta_data_->keyLength = 64;
-      return new BPlusTreeIndex<GenericKey<64>, RowId, GenericComparator<64>>
+      meta_data_->keyLength = 128;
+      return new BPlusTreeIndex<GenericKey<128>, RowId, GenericComparator<128>>
           (meta_data_->GetIndexId(), key_schema_,buffer_pool_manager);
     }
   }
