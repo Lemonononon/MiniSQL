@@ -14,15 +14,15 @@ bool TableHeap::InsertTuple(Row &row, Transaction *txn) {
       return false;
     }
     // Otherwise, insert tuple.
-    page->WLatch();
+//    page->WLatch();
     // 若insert完成,则返回true
     if (page->InsertTuple(row, schema_, txn, lock_manager_, log_manager_)) {
-      page->WUnlatch();
+//      page->WUnlatch();
       buffer_pool_manager_->UnpinPage(page->GetTablePageId(), true);
       return true;
     }
     // 否则继续找下一个page是否可以insert
-    page->WUnlatch();
+//    page->WUnlatch();
     buffer_pool_manager_->UnpinPage(page->GetTablePageId(), false);
     page_id_t next = page->GetNextPageId();
     // 若当前page不是最后一个page则继续循环,是最后一个就new一个page
@@ -33,9 +33,9 @@ bool TableHeap::InsertTuple(Row &row, Transaction *txn) {
       auto new_page = reinterpret_cast<TablePage *>(buffer_pool_manager_->NewPage(next));
       page->SetNextPageId(next);
       new_page->Init(next, page->GetPageId(), log_manager_, txn);
-      new_page->WLatch();
+//      new_page->WLatch();
       new_page->InsertTuple(row, schema_, txn, lock_manager_, log_manager_);
-      new_page->WUnlatch();
+//      new_page->WUnlatch();
       buffer_pool_manager_->UnpinPage(next, true);  // 存疑
       return true;
     }
