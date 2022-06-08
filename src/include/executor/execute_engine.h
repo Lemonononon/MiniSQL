@@ -6,9 +6,10 @@
 #include "common/dberr.h"
 #include "common/instance.h"
 #include "transaction/transaction.h"
-
 extern "C" {
+int yyparse(void);
 #include "parser/parser.h"
+#include "parser/minisql_lex.h"
 };
 
 /**

@@ -5,6 +5,7 @@
 #include "glog/logging.h"
 #include "utils/get_files.h"
 
+
 #define ENABLE_EXECUTE_DEBUG
 
 bool IsSatisfiedRow(Row *row, SyntaxNode *condition, uint32_t column_index, TypeId column_type);
@@ -674,7 +675,86 @@ dberr_t ExecuteEngine::ExecuteExecfile(pSyntaxNode ast, ExecuteContext *context)
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteExecfile" << std::endl;
 #endif
-  return DB_FAILED;
+  ASSERT(ast->type_ == kNodeExecFile, "Unexpected node type.");
+  std::string file_path = ast->child_->val_;
+  ifstream  fin;
+  // command buffer
+  const int buf_size = 1024;
+  char cmd[buf_size];
+  char in;
+
+  //尝试打开文件
+  try{
+    fin.open(file_path,ios::in);
+  }catch(...){
+    std::cout << "Open file \"" << file_path << "\" error!" << std::endl ;
+    return DB_FAILED;
+  }
+
+  //开始执行
+  bool isEOF = false;
+  while (!isEOF) {
+    // read from file
+    memset(cmd, 0, buf_size);
+    int i = 0;
+    fin.get(in);
+    while (in != ';') {
+      cmd[i++] = in;
+      fin.get(in);
+    }
+    cmd[i] = in;    // ;
+    if(!fin.get(in)) isEOF = true;        // remove enter, if meet EOF, break
+
+    // create buffer for sql input
+    YY_BUFFER_STATE bp = yy_scan_string(cmd);
+    if (bp == nullptr) {
+      LOG(ERROR) << "Failed to create yy buffer state." << std::endl;
+      exit(1);
+    }
+    yy_switch_to_buffer(bp);
+
+    // init parser module
+    MinisqlParserInit();
+
+    // parse
+    yyparse();
+
+    // parse result handle
+    if (MinisqlParserGetError()) {
+      // error
+      cout << "syntax error in cmd: " << cmd << std::endl;
+      printf("%s\n", MinisqlParserGetErrorMessage());
+      return DB_FAILED;
+    } else {
+#ifdef ENABLE_PARSER_DEBUG
+      printf("[INFO] Sql syntax parse ok!\n");
+      SyntaxTreePrinter printer(MinisqlGetParserRootNode());
+      printer.PrintTree(syntax_tree_file_mgr[syntax_tree_id++]);
+#endif
+    }
+
+    ExecuteContext executeContext;
+    if(Execute(MinisqlGetParserRootNode(), &executeContext) != DB_SUCCESS){
+      cout << "SQL execute error in \"" << cmd << "\" !" << std::endl;
+      return DB_FAILED;
+    };
+    //TODO: what is this?
+    sleep(1);
+
+    // clean memory after parse
+    MinisqlParserFinish();
+    yy_delete_buffer(bp);
+    yylex_destroy();
+
+    // quit condition
+    if (executeContext.flag_quit_) {
+      printf("bye!\n");
+      break;
+    }
+
+  }
+  cout << "Execute file \"" << file_path << "\" success!" << std::endl;
+  return DB_SUCCESS;
 }
 
 dberr_t ExecuteEngine::ExecuteQuit(pSyntaxNode ast, ExecuteContext *context) {
