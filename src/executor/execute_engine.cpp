@@ -761,6 +761,8 @@ dberr_t ExecuteEngine::ExecuteTrxRollback(pSyntaxNode ast, ExecuteContext *conte
   return DB_FAILED;
 }
 
+//可以是任意非二进制文件
+//文件要求：1. 末尾无空行 2. 句中无空行 3. 一行一句
 dberr_t ExecuteEngine::ExecuteExecfile(pSyntaxNode ast, ExecuteContext *context) {
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteExecfile" << std::endl;
@@ -773,11 +775,10 @@ dberr_t ExecuteEngine::ExecuteExecfile(pSyntaxNode ast, ExecuteContext *context)
   char cmd[buf_size];
   char in;
 
-  //尝试打开文件
-  try{
-    fin.open(file_path,ios::in);
-  }catch(...){
-    std::cout << "Open file \"" << file_path << "\" error!" << std::endl ;
+  //打开文件
+  fin.open(file_path,ios::in);
+  if( !fin.is_open() ){
+    std::cout << "No file \"" << file_path << "\"!" << std::endl ;
     return DB_FAILED;
   }
 
