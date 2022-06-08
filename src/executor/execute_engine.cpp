@@ -713,14 +713,17 @@ dberr_t ExecuteEngine::ExecuteDelete(pSyntaxNode ast, ExecuteContext *context) {
     now_condition.clear();
   }
   // 利用conditions进行查询
+  // 如果是delete全部 ，那就不需要index
   vector<IndexInfo *> indexes;
-  vector<RowId> results = GetSatisfiedRowIds(conditions, table_info, indexes);
-  for (uint32_t i = 0; i < results.size(); i++) {
-    table_heap->ApplyDelete(results[i], nullptr);
-    dbs_[current_db_]->bpm_->FlushAllPages();
-  }
-  cout << "Query OK, " << results.size() << " rows affected" << endl;
-  return DB_SUCCESS;
+  dbs_[current_db_]->catalog_mgr_->GetTableIndexes(table_name, indexes);
+  cout << "We have " << indexes.size() << " indexes" << endl;
+  auto results = GetSatisfiedRowIds(conditions, table_info, indexes);
+    for (uint32_t i = 0; i < results.size(); i++) {
+      table_heap->ApplyDelete(results[i], nullptr);
+      dbs_[current_db_]->bpm_->FlushAllPages();
+    }
+    cout << "Query OK, " << results.size() << " rows affected" << endl;
+    return DB_SUCCESS;
 }
 
 dberr_t ExecuteEngine::ExecuteUpdate(pSyntaxNode ast, ExecuteContext *context) {
