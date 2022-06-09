@@ -5,7 +5,7 @@
 #include "utils/tree_file_mgr.h"
 #include <sys/time.h>
 
-#define ENABLE_PARSER_DEBUG
+//#define ENABLE_PARSER_DEBUG
 
 extern "C" {
 int yyparse(void);
@@ -78,7 +78,7 @@ int main(int argc, char **argv) {
     gettimeofday(&start, NULL);
     engine.Execute(MinisqlGetParserRootNode(), &context);
     gettimeofday(&end, NULL);
-    sleep(1);
+    // sleep(1);
     cout << context.related_row_num_ << " rows affected ";
     cout << "(" << ((end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec)/1000000.0) << "s" << ")" << endl;
 

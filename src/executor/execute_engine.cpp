@@ -475,8 +475,30 @@ dberr_t ExecuteEngine::ExecuteDropIndex(pSyntaxNode ast, ExecuteContext *context
   }
   string index_name = ast->child_->val_;
   // dbs_[current_db_]->catalog_mgr_->DropIndex(index_name); // 我不理解，为什么还要table_name
-  cout << "Drop index " << index_name << " OK" << endl;
-  return DB_SUCCESS;
+  vector<TableInfo*> tables;
+  vector<string> table_names;
+  dbs_[current_db_]->catalog_mgr_->GetTables(tables);
+  for (auto table : tables) {
+    table_names.emplace_back(table->GetTableName());
+  }
+  if (tables.size() == 0) {
+    cout << "ERROR: No tables yet" << endl;
+    return DB_FAILED;
+  }
+  bool has_found = false;
+  for (auto table_name : table_names) {
+    if (dbs_[current_db_]->catalog_mgr_->DropIndex(table_name, index_name) == DB_SUCCESS) {
+      has_found = true;
+      break;
+    }
+  }
+  if (has_found) {
+    cout << "Drop index " << index_name << " OK" << endl;
+    return DB_SUCCESS;
+  } else {
+    cout << "ERROR: Index " << index_name << " not found" << endl;
+    return DB_FAILED;
+  }
 }
 
 dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
@@ -978,8 +1000,6 @@ dberr_t ExecuteEngine::ExecuteExecfile(pSyntaxNode ast, ExecuteContext *context)
       cout << "SQL execute error in \"" << cmd << "\" !" << std::endl;
       return DB_FAILED;
     };
-    // TODO: what is this?
-    sleep(1);
 
     // clean memory after parse
     MinisqlParserFinish();

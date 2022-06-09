@@ -216,6 +216,7 @@ dberr_t CatalogManager::CreateIndex(const std::string &table_name, const string 
   meta_data->SerializeTo(meta_data_page->GetData());
   //  meta_data_page->WUnlatch();
   catalog_meta_->index_meta_pages_[index_id] = meta_data_page_id;
+  buffer_pool_manager_->UnpinPage(meta_data_page_id, true);
   // 将改动刷盘
   FlushCatalogMetaPage();
   return DB_SUCCESS;
@@ -369,7 +370,7 @@ dberr_t CatalogManager::LoadTable(const table_id_t table_id, const page_id_t pag
                                             log_manager_, lock_manager_, table_info->GetMemHeap());
   table_info->Init(meta_data, table_heap);
   tables_[table_id] = table_info;
-
+  buffer_pool_manager_->UnpinPage(page_id, false);
   return DB_SUCCESS;
 }
 
@@ -408,7 +409,7 @@ dberr_t CatalogManager::LoadIndex(const index_id_t index_id, const page_id_t pag
   // step4: init index_info并插入indexes_
   index_info->Init(meta_data, tables_[table_id], buffer_pool_manager_);
   indexes_[index_id] = index_info;
-
+  buffer_pool_manager_->UnpinPage(page_id, false);
   return DB_SUCCESS;
 }
 
