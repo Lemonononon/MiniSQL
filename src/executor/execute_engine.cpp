@@ -13,7 +13,11 @@ string GetFieldString(Field *field, TypeId type);
 vector<RowId> GetSatisfiedRowIds(vector<vector<SyntaxNode *>> conditions, TableInfo *table_info,
                                  vector<IndexInfo *> indexes);
 string path = "./db/";
-
+struct package{
+  uint32_t idx;
+  TypeId column_type;
+  char* set_value;
+};
 ExecuteEngine::ExecuteEngine() {
   cout << " __  __ _       _  _____  ____  _" << endl;
   cout << "|  \\/  (_)     (_)/ ____|/ __ \\| |" << endl;
@@ -753,7 +757,102 @@ dberr_t ExecuteEngine::ExecuteUpdate(pSyntaxNode ast, ExecuteContext *context) {
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteUpdate" << std::endl;
 #endif
-  // TODO: xjj, finish this
+  // 首先根据语法树，找到需要从哪张表里删除
+  ast = ast->child_;
+  string table_name = ast->val_;
+  TableInfo *table_info;
+  if (dbs_[current_db_]->catalog_mgr_->GetTable(table_name, table_info) == DB_TABLE_NOT_EXIST) {
+    cout << "ERROR: Table not exist" << endl;
+    return DB_FAILED;
+  }
+  TableHeap *table_heap = table_info->GetTableHeap();
+  vector<vector<pSyntaxNode>> conditions;
+  vector<pSyntaxNode> now_condition;
+  pSyntaxNode values = ast->next_;
+  ast = ast->next_;
+  //如果update有条件则存在condition里
+  if (ast->next_) {
+    ast = ast->next_->child_;
+    while (ast->type_ == kNodeConnector) {
+      now_condition.emplace_back(ast->child_->next_);
+      string connector = ast->val_;
+      if (connector == "or") {
+        conditions.emplace_back(now_condition);
+        now_condition.clear();
+      }
+      ast = ast->child_;
+    }
+    now_condition.emplace_back(ast);
+    conditions.emplace_back(now_condition);
+    now_condition.clear();
+  }
+  //现在来处理需要update的值,我们将所有类型为kNodeUpdateValue的节点存入need_set中
+  vector<pSyntaxNode> need_set;
+  values = values->child_;
+  while(values&&values->type_==kNodeUpdateValue){
+    need_set.emplace_back(values);
+    values = values->next_;
+  }
+  //获取符合条件的rows
+  vector<IndexInfo *> indexes;
+  dbs_[current_db_]->catalog_mgr_->GetTableIndexes(table_name, indexes);
+  cout << "We have " << indexes.size() << " indexes" << endl;
+  auto results = GetSatisfiedRowIds(conditions, table_info, indexes);
+  //
+  vector<int> value_index;
+  vector<TypeId> column_type;
+  vector<string> set_value;
+  map<uint32_t ,package> need_update;
+  //遍历比较值
+  for(auto itr: need_set){
+    //遍历column
+    for(uint32_t i=0;i<table_info->GetSchema()->GetColumnCount();i++){
+      Column now_column = table_info->GetSchema()->GetColumn(i);
+      //如果当前column和当前节点的字段名称相同，则将它的信息放入容器
+      if(now_column.GetName()==itr->child_->val_){
+        struct package tmp;
+        tmp.idx=i;
+        tmp.column_type = now_column.GetType();
+        tmp.set_value = itr->child_->next_->val_;
+        need_update[i]=tmp;
+      }
+    }
+  }
+  //开始update
+  context->related_row_num_ = results.size();
+  Schema * now_schema = table_info->GetSchema();
+  for(auto itr: results){
+    vector<Field> new_fields;
+    Row now_row(itr);
+    table_heap->GetTuple(&now_row, nullptr);
+    for(uint32_t idx=0;idx<now_schema->GetColumnCount();idx++){
+        if(need_update.find(idx)!=need_update.end()){
+          //这里是需要更新的
+            if(need_update[idx].column_type==kTypeInt){
+              Field tmp(kTypeInt,atoi(need_update[idx].set_value));
+              new_fields.emplace_back(tmp);
+            }
+            else if(need_update[idx].column_type==kTypeFloat){
+              Field tmp(kTypeFloat,(float )atof(need_update[idx].set_value));
+              new_fields.emplace_back(tmp);
+            }
+            else {
+              Field tmp(kTypeChar,need_update[idx].set_value, strlen(need_update[idx].set_value),false);
+              new_fields.emplace_back(tmp);
+            }
+        }
+        else{
+          //这里直接复制就好
+          Field tmp(*now_row.GetField(idx));
+          new_fields.emplace_back(tmp);
+        }
+    }
+    //利用fields构建新的Row并update,注意保持rowid不变
+    Row new_row(new_fields);
+    new_row.SetRowId(itr);
+    table_heap->UpdateTuple(new_row,itr, nullptr);
+    dbs_[current_db_]->bpm_->FlushAllPages();
+  }
 
   return DB_SUCCESS;
 }
