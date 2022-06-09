@@ -656,6 +656,13 @@ dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext *context) {
   if (get_table_result != DB_SUCCESS) return get_table_result;
   vector<Field> fields;
   auto columns = table_info->GetSchema()->GetColumns();
+  //约束性的判断，unique和primary都需要满足唯一、非空（不是null）
+  //不需要去column判断是否unique，直接获取这张表的索引，索引unique即可（因为minisql的约束并不完整
+  std::vector<IndexInfo *> indexes;
+  if (dbs_[current_db_]->catalog_mgr_->GetTableIndexes(table_name, indexes)!=DB_SUCCESS){
+    cout << "Indexes exist, but query index info failed" << endl;
+    return DB_FAILED;
+  }
   // 第一个value
   auto val_node = ast->child_->next_->child_;
   // 遍历以获取每个field的类型，如果语法树value的结点不够，则报错
@@ -665,16 +672,14 @@ dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext *context) {
       cout << "wrong insert format!" << endl;
       return DB_FAILED;
     }
-    // 约束性的判断，unique和primary都需要满足唯一、非空（不是null）
-    //  TODO:似乎并没有办法获取表里是否有主键，以及主键的组成
-    if ((*itr)->IsUnique()) {
-      if (string(val_node->val_) == "null") {
-        cout << "can not insert null to unique column" << endl;
-        context->related_row_num_ = 0;
-        return DB_FAILED;
-      }
-      // TODO:判断唯一性，去索引里面查找
-    }
+//    if ((*itr)->IsUnique()){
+//      if (string(val_node->val_) == "null"){
+//        cout << "can not insert null to unique column"<< endl;
+//        context->related_row_num_ = 0;
+//        return DB_FAILED;
+//      }
+//      //判断唯一性，去索引里面查找
+//    }
 
     uint32_t type = (*itr)->GetType();
     // int
