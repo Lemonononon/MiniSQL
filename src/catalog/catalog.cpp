@@ -328,6 +328,8 @@ dberr_t CatalogManager::DropIndex(const string &table_name, const string &index_
       }
       // 从indexes_中删除该index
       indexes_.erase(index_id);
+      // 在catalog_meta_data中删除
+      catalog_meta_->index_meta_pages_.erase(catalog_meta_->index_meta_pages_.find(index_id));
     }
   }
   // 将改动刷盘

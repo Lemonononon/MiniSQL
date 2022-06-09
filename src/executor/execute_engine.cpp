@@ -5,7 +5,7 @@
 #include "glog/logging.h"
 #include "utils/get_files.h"
 
-#define ENABLE_EXECUTE_DEBUG
+//#define ENABLE_EXECUTE_DEBUG
 
 bool IsSatisfiedRow(Row *row, SyntaxNode *condition, uint32_t column_index, TypeId column_type);
 string GetFieldString(Field *field, TypeId type);
@@ -103,6 +103,7 @@ dberr_t ExecuteEngine::ExecuteCreateDatabase(pSyntaxNode ast, ExecuteContext *co
   } else {
     dbs_.emplace(ast->child_->val_, new DBStorageEngine(path + ast->child_->val_ + ".db"));
     cout << "Create " << ast->child_->val_ << " OK" << endl;
+    context->related_row_num_ += 1;
     return DB_SUCCESS;
   }
 }
@@ -121,6 +122,7 @@ dberr_t ExecuteEngine::ExecuteDropDatabase(pSyntaxNode ast, ExecuteContext *cont
     delete dbs_.find(db_name)->second;
     dbs_.erase(db_name);
     cout << "Drop " << db_name << " OK" << endl;
+    context->related_row_num_ += 1;
     return DB_SUCCESS;
   }
 }
@@ -129,6 +131,7 @@ dberr_t ExecuteEngine::ExecuteShowDatabases(pSyntaxNode ast, ExecuteContext *con
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteShowDatabases" << std::endl;
 #endif
+  context->related_row_num_ += dbs_.size();
   if (dbs_.size() == 0) {
     cout << "empty set" << endl;
     return DB_SUCCESS;
@@ -180,6 +183,7 @@ dberr_t ExecuteEngine::ExecuteShowTables(pSyntaxNode ast, ExecuteContext *contex
   if (dbs_[current_db_]->catalog_mgr_->GetTables(tables))
     return DB_FAILED;
   else {
+    context->related_row_num_ += tables.size();
     if (tables.size() == 0) {
       cout << "empty set" << endl;
     } else {
@@ -305,6 +309,7 @@ dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext *conte
   }
 
   dbs_[current_db_]->bpm_->FlushAllPages();
+  context->related_row_num_ += 1;
   return DB_SUCCESS;
 }
 
@@ -326,6 +331,7 @@ dberr_t ExecuteEngine::ExecuteDropTable(pSyntaxNode ast, ExecuteContext *context
       cout << "ERROR: Table not exist" << endl;
       return DB_FAILED;
     default:
+      context->related_row_num_ += 1;
       return DB_SUCCESS;
   }
 }
@@ -358,6 +364,7 @@ dberr_t ExecuteEngine::ExecuteShowIndexes(pSyntaxNode ast, ExecuteContext *conte
     //    indexes.insert(indexes.end(), tmp_indexes.begin(), tmp_indexes.end());
   }
 
+  context->related_row_num_ += indexes.size();
   if (indexes.empty()) {
     cout << "empty set" << endl;
     return DB_SUCCESS;
@@ -386,7 +393,6 @@ dberr_t ExecuteEngine::ExecuteCreateIndex(pSyntaxNode ast, ExecuteContext *conte
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteCreateIndex" << std::endl;
 #endif
-  // TODO: 只有unique的可以创建index
   if (dbs_.find(current_db_) == dbs_.end()) {
     cout << "ERROR: No current database" << endl;
     return DB_FAILED;
@@ -462,6 +468,7 @@ dberr_t ExecuteEngine::ExecuteCreateIndex(pSyntaxNode ast, ExecuteContext *conte
   delete[] column_index;
   cout << "Create bptree index " << index_name << " OK" << endl;
   dbs_[current_db_]->bpm_->FlushAllPages();
+  context->related_row_num_ += 1;
   return DB_SUCCESS;
 }
 
@@ -494,6 +501,7 @@ dberr_t ExecuteEngine::ExecuteDropIndex(pSyntaxNode ast, ExecuteContext *context
   }
   if (has_found) {
     cout << "Drop index " << index_name << " OK" << endl;
+    context->related_row_num_ += 1;
     return DB_SUCCESS;
   } else {
     cout << "ERROR: Index " << index_name << " not found" << endl;
@@ -762,6 +770,7 @@ dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext *context) {
     index->GetIndex()->InsertEntry(index_row, row.GetRowId(), nullptr);
   }
   dbs_[current_db_]->bpm_->FlushAllPages();
+  context->related_row_num_ += 1;
   return DB_SUCCESS;
 }
 
@@ -806,7 +815,7 @@ dberr_t ExecuteEngine::ExecuteDelete(pSyntaxNode ast, ExecuteContext *context) {
   }
   cout << "We have " << indexes.size() << " indexes" << endl;
   auto results = GetSatisfiedRowIds(conditions, table_info, indexes);
-  context->related_row_num_ = results.size();
+  context->related_row_num_ += results.size();
   for (uint32_t i = 0; i < results.size(); i++) {
     Row old_row(results[i]);
     table_heap->GetTuple(&old_row, nullptr);
@@ -903,7 +912,7 @@ dberr_t ExecuteEngine::ExecuteUpdate(pSyntaxNode ast, ExecuteContext *context) {
     }
   }
   // 开始update
-  context->related_row_num_ = results.size();
+  context->related_row_num_ += results.size();
   Schema *now_schema = table_info->GetSchema();
   for (auto itr : results) {
     vector<Field> new_fields;
@@ -1068,8 +1077,7 @@ dberr_t ExecuteEngine::ExecuteExecfile(pSyntaxNode ast, ExecuteContext *context)
 #endif
     }
 
-    ExecuteContext executeContext;
-    if (Execute(MinisqlGetParserRootNode(), &executeContext) != DB_SUCCESS) {
+    if (Execute(MinisqlGetParserRootNode(), context) != DB_SUCCESS) {
       cout << "SQL execute error in \"" << cmd << "\" !" << std::endl;
       return DB_FAILED;
     };
@@ -1080,7 +1088,7 @@ dberr_t ExecuteEngine::ExecuteExecfile(pSyntaxNode ast, ExecuteContext *context)
     yylex_destroy();
 
     // quit condition
-    if (executeContext.flag_quit_) {
+    if (context->flag_quit_) {
       printf("bye!\n");
       break;
     }
