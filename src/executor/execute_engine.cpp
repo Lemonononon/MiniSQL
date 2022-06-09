@@ -5,7 +5,6 @@
 #include "glog/logging.h"
 #include "utils/get_files.h"
 
-
 #define ENABLE_EXECUTE_DEBUG
 
 bool IsSatisfiedRow(Row *row, SyntaxNode *condition, uint32_t column_index, TypeId column_type);
@@ -13,10 +12,10 @@ string GetFieldString(Field *field, TypeId type);
 vector<RowId> GetSatisfiedRowIds(vector<vector<SyntaxNode *>> conditions, TableInfo *table_info,
                                  vector<IndexInfo *> indexes);
 string path = "./db/";
-struct package{
+struct package {
   uint32_t idx;
   TypeId column_type;
-  char* set_value;
+  char *set_value;
 };
 ExecuteEngine::ExecuteEngine() {
   cout << " __  __ _       _  _____  ____  _" << endl;
@@ -222,7 +221,7 @@ dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext *conte
   auto node = ast->child_->next_->child_;
   uint32_t column_index = 0;
 
-  //记录哪些列需要建立unique index
+  // 记录哪些列需要建立unique index
   vector<vector<string>> unique_indexes;
   // 记录所有的column对象，后续需要所有column对象的指针来创建TableSchema
   // vector<Column> columns_list;
@@ -285,20 +284,21 @@ dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext *conte
     }
   }
   if (primary_keys.size() > 0) {
-    string primary_index_name = table_name + "_"+ "PRIMARY";
+    string primary_index_name = table_name + "_" + "PRIMARY";
     IndexInfo *primary_index_info;
-    if (dbs_[current_db_]->catalog_mgr_->CreateIndex(table_name, primary_index_name, primary_keys, nullptr, primary_index_info)){
+    if (dbs_[current_db_]->catalog_mgr_->CreateIndex(table_name, primary_index_name, primary_keys, nullptr,
+                                                     primary_index_info)) {
       cout << "ERROR: Primary Key Index create failed" << endl;
       return DB_FAILED;
     }
   }
 
-
-  //为所有的unique列建立索引
-  for ( auto unique_itr = unique_indexes.begin(); unique_itr != unique_indexes.end() ; unique_itr++) {
+  // 为所有的unique列建立索引
+  for (auto unique_itr = unique_indexes.begin(); unique_itr != unique_indexes.end(); unique_itr++) {
     string unique_index_name = table_name + "_" + (*unique_itr)[0];
     IndexInfo *unique_index_info;
-    if (dbs_[current_db_]->catalog_mgr_->CreateIndex(table_name, unique_index_name, *unique_itr, nullptr, unique_index_info)){
+    if (dbs_[current_db_]->catalog_mgr_->CreateIndex(table_name, unique_index_name, *unique_itr, nullptr,
+                                                     unique_index_info)) {
       cout << "Create unique index on " << unique_index_name << "failed" << endl;
       return DB_FAILED;
     }
@@ -339,34 +339,33 @@ dberr_t ExecuteEngine::ExecuteShowIndexes(pSyntaxNode ast, ExecuteContext *conte
     return DB_FAILED;
   }
 
-  //获取所有的表
+  // 获取所有的表
   std::vector<TableInfo *> tables;
-  if (dbs_[current_db_]->catalog_mgr_->GetTables(tables))
-    return DB_FAILED;
+  if (dbs_[current_db_]->catalog_mgr_->GetTables(tables)) return DB_FAILED;
 
-  //没有表，结束
-  if (tables.empty()){
+  // 没有表，结束
+  if (tables.empty()) {
     cout << "empty set" << endl;
     return DB_SUCCESS;
   }
 
   std::vector<IndexInfo *> indexes;
-//  std::vector<IndexInfo *> tmp_indexes;
-  for ( auto itr = tables.begin(); itr != tables.end(); itr++) {
-    if ( dbs_[current_db_]->catalog_mgr_->GetTableIndexes((*itr)->GetTableName(), indexes) != DB_SUCCESS) return DB_FAILED;
-    //insert效率会低? 不过一般index较少，影响不大
-//    indexes.insert(indexes.end(), tmp_indexes.begin(), tmp_indexes.end());
+  //  std::vector<IndexInfo *> tmp_indexes;
+  for (auto itr = tables.begin(); itr != tables.end(); itr++) {
+    if (dbs_[current_db_]->catalog_mgr_->GetTableIndexes((*itr)->GetTableName(), indexes) != DB_SUCCESS)
+      return DB_FAILED;
+    // insert效率会低? 不过一般index较少，影响不大
+    //    indexes.insert(indexes.end(), tmp_indexes.begin(), tmp_indexes.end());
   }
 
   if (indexes.empty()) {
-    cout << "empty set" <<endl;
+    cout << "empty set" << endl;
     return DB_SUCCESS;
-  }else {
+  } else {
     unsigned long max_length = 5;
     for (auto index : indexes) {
-      if (index->GetIndexName().size() > max_length)
-        max_length = index->GetIndexName().size();
-      }
+      if (index->GetIndexName().size() > max_length) max_length = index->GetIndexName().size();
+    }
     cout << "+-" << setw(max_length) << setfill('-') << "-"
          << "-+" << endl;
     cout << "| " << setw(max_length) << setfill(' ') << left << "Index"
@@ -407,7 +406,7 @@ dberr_t ExecuteEngine::ExecuteCreateIndex(pSyntaxNode ast, ExecuteContext *conte
   }
   // 记录是否存在unique键，只有索引列中有一个是unique的，才可以建立索引
   bool is_unique = false;
-  TableInfo* table_info;
+  TableInfo *table_info;
   if (dbs_[current_db_]->catalog_mgr_->GetTable(table_name, table_info) == DB_TABLE_NOT_EXIST) {
     cout << "ERROR: Table not exist" << endl;
     return DB_FAILED;
@@ -666,15 +665,15 @@ dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext *context) {
       cout << "wrong insert format!" << endl;
       return DB_FAILED;
     }
-    //约束性的判断，unique和primary都需要满足唯一、非空（不是null）
-    // TODO:似乎并没有办法获取表里是否有主键，以及主键的组成
-    if ((*itr)->IsUnique()){
-      if (string(val_node->val_) == "null"){
-        cout << "can not insert null to unique column"<< endl;
+    // 约束性的判断，unique和primary都需要满足唯一、非空（不是null）
+    //  TODO:似乎并没有办法获取表里是否有主键，以及主键的组成
+    if ((*itr)->IsUnique()) {
+      if (string(val_node->val_) == "null") {
+        cout << "can not insert null to unique column" << endl;
         context->related_row_num_ = 0;
         return DB_FAILED;
       }
-      //TODO:判断唯一性，去索引里面查找
+      // TODO:判断唯一性，去索引里面查找
     }
 
     uint32_t type = (*itr)->GetType();
@@ -696,7 +695,7 @@ dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext *context) {
   Row row(fields);
   // 插入数据
   table_info->GetTableHeap()->InsertTuple(row, nullptr);
-  //TODO:更新索引
+  // TODO:更新索引
 
   dbs_[current_db_]->bpm_->FlushAllPages();
   return DB_SUCCESS;
@@ -739,12 +738,12 @@ dberr_t ExecuteEngine::ExecuteDelete(pSyntaxNode ast, ExecuteContext *context) {
   dbs_[current_db_]->catalog_mgr_->GetTableIndexes(table_name, indexes);
   cout << "We have " << indexes.size() << " indexes" << endl;
   auto results = GetSatisfiedRowIds(conditions, table_info, indexes);
-    for (uint32_t i = 0; i < results.size(); i++) {
-      table_heap->ApplyDelete(results[i], nullptr);
-      dbs_[current_db_]->bpm_->FlushAllPages();
-    }
-    cout << "Query OK, " << results.size() << " rows affected" << endl;
-    return DB_SUCCESS;
+  context->related_row_num_ = results.size();
+  for (uint32_t i = 0; i < results.size(); i++) {
+    table_heap->ApplyDelete(results[i], nullptr);
+    dbs_[current_db_]->bpm_->FlushAllPages();
+  }
+  return DB_SUCCESS;
 }
 
 dberr_t ExecuteEngine::ExecuteUpdate(pSyntaxNode ast, ExecuteContext *context) {
@@ -764,7 +763,7 @@ dberr_t ExecuteEngine::ExecuteUpdate(pSyntaxNode ast, ExecuteContext *context) {
   vector<pSyntaxNode> now_condition;
   pSyntaxNode values = ast->next_;
   ast = ast->next_;
-  //如果update有条件则存在condition里
+  // 如果update有条件则存在condition里
   if (ast->next_) {
     ast = ast->next_->child_;
     while (ast->type_ == kNodeConnector) {
@@ -780,14 +779,14 @@ dberr_t ExecuteEngine::ExecuteUpdate(pSyntaxNode ast, ExecuteContext *context) {
     conditions.emplace_back(now_condition);
     now_condition.clear();
   }
-  //现在来处理需要update的值,我们将所有类型为kNodeUpdateValue的节点存入need_set中
+  // 现在来处理需要update的值,我们将所有类型为kNodeUpdateValue的节点存入need_set中
   vector<pSyntaxNode> need_set;
   values = values->child_;
-  while(values&&values->type_==kNodeUpdateValue){
+  while (values && values->type_ == kNodeUpdateValue) {
     need_set.emplace_back(values);
     values = values->next_;
   }
-  //获取符合条件的rows
+  // 获取符合条件的rows
   vector<IndexInfo *> indexes;
   dbs_[current_db_]->catalog_mgr_->GetTableIndexes(table_name, indexes);
   cout << "We have " << indexes.size() << " indexes" << endl;
@@ -796,55 +795,52 @@ dberr_t ExecuteEngine::ExecuteUpdate(pSyntaxNode ast, ExecuteContext *context) {
   vector<int> value_index;
   vector<TypeId> column_type;
   vector<string> set_value;
-  map<uint32_t ,package> need_update;
-  //遍历比较值
-  for(auto itr: need_set){
-    //遍历column
-    for(uint32_t i=0;i<table_info->GetSchema()->GetColumnCount();i++){
+  map<uint32_t, package> need_update;
+  // 遍历比较值
+  for (auto itr : need_set) {
+    // 遍历column
+    for (uint32_t i = 0; i < table_info->GetSchema()->GetColumnCount(); i++) {
       Column now_column = table_info->GetSchema()->GetColumn(i);
-      //如果当前column和当前节点的字段名称相同，则将它的信息放入容器
-      if(now_column.GetName()==itr->child_->val_){
+      // 如果当前column和当前节点的字段名称相同，则将它的信息放入容器
+      if (now_column.GetName() == itr->child_->val_) {
         struct package tmp;
-        tmp.idx=i;
+        tmp.idx = i;
         tmp.column_type = now_column.GetType();
         tmp.set_value = itr->child_->next_->val_;
-        need_update[i]=tmp;
+        need_update[i] = tmp;
       }
     }
   }
-  //开始update
+  // 开始update
   context->related_row_num_ = results.size();
-  Schema * now_schema = table_info->GetSchema();
-  for(auto itr: results){
+  Schema *now_schema = table_info->GetSchema();
+  for (auto itr : results) {
     vector<Field> new_fields;
     Row now_row(itr);
     table_heap->GetTuple(&now_row, nullptr);
-    for(uint32_t idx=0;idx<now_schema->GetColumnCount();idx++){
-        if(need_update.find(idx)!=need_update.end()){
-          //这里是需要更新的
-            if(need_update[idx].column_type==kTypeInt){
-              Field tmp(kTypeInt,atoi(need_update[idx].set_value));
-              new_fields.emplace_back(tmp);
-            }
-            else if(need_update[idx].column_type==kTypeFloat){
-              Field tmp(kTypeFloat,(float )atof(need_update[idx].set_value));
-              new_fields.emplace_back(tmp);
-            }
-            else {
-              Field tmp(kTypeChar,need_update[idx].set_value, strlen(need_update[idx].set_value),false);
-              new_fields.emplace_back(tmp);
-            }
-        }
-        else{
-          //这里直接复制就好
-          Field tmp(*now_row.GetField(idx));
+    for (uint32_t idx = 0; idx < now_schema->GetColumnCount(); idx++) {
+      if (need_update.find(idx) != need_update.end()) {
+        // 这里是需要更新的
+        if (need_update[idx].column_type == kTypeInt) {
+          Field tmp(kTypeInt, atoi(need_update[idx].set_value));
+          new_fields.emplace_back(tmp);
+        } else if (need_update[idx].column_type == kTypeFloat) {
+          Field tmp(kTypeFloat, (float)atof(need_update[idx].set_value));
+          new_fields.emplace_back(tmp);
+        } else {
+          Field tmp(kTypeChar, need_update[idx].set_value, strlen(need_update[idx].set_value), false);
           new_fields.emplace_back(tmp);
         }
+      } else {
+        // 这里直接复制就好
+        Field tmp(*now_row.GetField(idx));
+        new_fields.emplace_back(tmp);
+      }
     }
-    //利用fields构建新的Row并update,注意保持rowid不变
+    // 利用fields构建新的Row并update,注意保持rowid不变
     Row new_row(new_fields);
     new_row.SetRowId(itr);
-    table_heap->UpdateTuple(new_row,itr, nullptr);
+    table_heap->UpdateTuple(new_row, itr, nullptr);
     dbs_[current_db_]->bpm_->FlushAllPages();
   }
 
@@ -872,28 +868,28 @@ dberr_t ExecuteEngine::ExecuteTrxRollback(pSyntaxNode ast, ExecuteContext *conte
   return DB_FAILED;
 }
 
-//可以是任意非二进制文件
-//文件要求：1. 末尾无空行 2. 句中无空行 3. 一行一句
+// 可以是任意非二进制文件
+// 文件要求：1. 末尾无空行 2. 句中无空行 3. 一行一句
 dberr_t ExecuteEngine::ExecuteExecfile(pSyntaxNode ast, ExecuteContext *context) {
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteExecfile" << std::endl;
 #endif
   ASSERT(ast->type_ == kNodeExecFile, "Unexpected node type.");
   std::string file_path = ast->child_->val_;
-  ifstream  fin;
+  ifstream fin;
   // command buffer
   const int buf_size = 1024;
   char cmd[buf_size];
   char in;
 
-  //打开文件
-  fin.open(file_path,ios::in);
-  if( !fin.is_open() ){
-    std::cout << "No file \"" << file_path << "\"!" << std::endl ;
+  // 打开文件
+  fin.open(file_path, ios::in);
+  if (!fin.is_open()) {
+    std::cout << "No file \"" << file_path << "\"!" << std::endl;
     return DB_FAILED;
   }
 
-  //开始执行
+  // 开始执行
   bool isEOF = false;
   while (!isEOF) {
     // read from file
@@ -904,8 +900,8 @@ dberr_t ExecuteEngine::ExecuteExecfile(pSyntaxNode ast, ExecuteContext *context)
       cmd[i++] = in;
       fin.get(in);
     }
-    cmd[i] = in;    // ;
-    if(!fin.get(in)) isEOF = true;        // remove enter, if meet EOF, break
+    cmd[i] = in;                     // ;
+    if (!fin.get(in)) isEOF = true;  // remove enter, if meet EOF, break
 
     // create buffer for sql input
     YY_BUFFER_STATE bp = yy_scan_string(cmd);
@@ -936,11 +932,11 @@ dberr_t ExecuteEngine::ExecuteExecfile(pSyntaxNode ast, ExecuteContext *context)
     }
 
     ExecuteContext executeContext;
-    if(Execute(MinisqlGetParserRootNode(), &executeContext) != DB_SUCCESS){
+    if (Execute(MinisqlGetParserRootNode(), &executeContext) != DB_SUCCESS) {
       cout << "SQL execute error in \"" << cmd << "\" !" << std::endl;
       return DB_FAILED;
     };
-    //TODO: what is this?
+    // TODO: what is this?
     sleep(1);
 
     // clean memory after parse
@@ -953,7 +949,6 @@ dberr_t ExecuteEngine::ExecuteExecfile(pSyntaxNode ast, ExecuteContext *context)
       printf("bye!\n");
       break;
     }
-
   }
   cout << "Execute file \"" << file_path << "\" success!" << std::endl;
   return DB_SUCCESS;
