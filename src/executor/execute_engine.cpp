@@ -482,7 +482,7 @@ dberr_t ExecuteEngine::ExecuteDropIndex(pSyntaxNode ast, ExecuteContext *context
   }
   string index_name = ast->child_->val_;
   // dbs_[current_db_]->catalog_mgr_->DropIndex(index_name); // 我不理解，为什么还要table_name
-  vector<TableInfo*> tables;
+  vector<TableInfo *> tables;
   vector<string> table_names;
   dbs_[current_db_]->catalog_mgr_->GetTables(tables);
   for (auto table : tables) {
@@ -820,26 +820,28 @@ dberr_t ExecuteEngine::ExecuteDelete(pSyntaxNode ast, ExecuteContext *context) {
     Row old_row(results[i]);
     table_heap->GetTuple(&old_row, nullptr);
     vector<Field> fields;
-    //获取需要被删除的row的所有field
-    for(uint32_t idx=0;i<table_info->GetSchema()->GetColumnCount();i++){
+    // 获取需要被删除的row的所有field
+    for (uint32_t idx = 0; idx < table_info->GetSchema()->GetColumnCount(); idx++) {
       fields.emplace_back(*old_row.GetField(idx));
     }
     table_heap->ApplyDelete(results[i], nullptr);
-    for (auto index : indexes) {
-      auto index_columns = index->GetIndexKeySchema()->GetColumns();
-      vector<uint32_t> column_indexes;  // 索引列的index标号
-      for (auto index_column : index_columns) {
-        uint32_t tmp;
-        if (table_info->GetSchema()->GetColumnIndex(index_column->GetName(), tmp) == DB_SUCCESS) {
-          column_indexes.emplace_back(tmp);
+    if (indexes.size() != 0) {
+      for (auto index : indexes) {
+        auto index_columns = index->GetIndexKeySchema()->GetColumns();
+        vector<uint32_t> column_indexes;  // 索引列的index标号
+        for (auto index_column : index_columns) {
+          uint32_t tmp;
+          if (table_info->GetSchema()->GetColumnIndex(index_column->GetName(), tmp) == DB_SUCCESS) {
+            column_indexes.emplace_back(tmp);
+          }
         }
+        vector<Field> index_key_fields;
+        for (auto column_index : column_indexes) {
+          index_key_fields.emplace_back(fields[column_index]);
+        }
+        Row index_row(index_key_fields);
+        index->GetIndex()->RemoveEntry(index_row, old_row.GetRowId(), nullptr);
       }
-      vector<Field> index_key_fields;
-      for (auto column_index : column_indexes) {
-        index_key_fields.emplace_back(fields[column_index]);
-      }
-      Row index_row(index_key_fields);
-      index->GetIndex()->RemoveEntry(index_row,old_row.GetRowId(), nullptr);
     }
     dbs_[current_db_]->bpm_->FlushAllPages();
   }
@@ -937,56 +939,60 @@ dberr_t ExecuteEngine::ExecuteUpdate(pSyntaxNode ast, ExecuteContext *context) {
         new_fields.emplace_back(tmp);
       }
     }
-    //判断即将更新的row会不会破坏index
-    bool is_satisfied_indexes = true;
-    string error_index_name;
-    for (auto index : indexes) {
-      auto index_columns = index->GetIndexKeySchema()->GetColumns();
-      vector<uint32_t> column_indexes;  // 索引列的index标号
-      for (auto index_column : index_columns) {
-        uint32_t tmp;
-        if (table_info->GetSchema()->GetColumnIndex(index_column->GetName(), tmp) == DB_SUCCESS) {
-          column_indexes.emplace_back(tmp);
+    // 判断即将更新的row会不会破坏index
+    if (indexes.size() != 0) {
+      bool is_satisfied_indexes = true;
+      string error_index_name;
+      for (auto index : indexes) {
+        auto index_columns = index->GetIndexKeySchema()->GetColumns();
+        vector<uint32_t> column_indexes;  // 索引列的index标号
+        for (auto index_column : index_columns) {
+          uint32_t tmp;
+          if (table_info->GetSchema()->GetColumnIndex(index_column->GetName(), tmp) == DB_SUCCESS) {
+            column_indexes.emplace_back(tmp);
+          }
+        }
+        vector<Field> index_key_fields;
+        for (auto column_index : column_indexes) {
+          index_key_fields.emplace_back(new_fields[column_index]);
+        }
+        Row index_check_row(index_key_fields);
+        vector<RowId> tmp_result;
+        if (index->GetIndex()->ScanKey(index_check_row, tmp_result, nullptr, "") == DB_SUCCESS) {
+          // 在b+树中找到了同样的节点，说明这个新行不满足唯一性
+          is_satisfied_indexes = false;
+          error_index_name = index->GetIndexName();
+          break;
         }
       }
-      vector<Field> index_key_fields;
-      for (auto column_index : column_indexes) {
-        index_key_fields.emplace_back(new_fields[column_index]);
+      if (!is_satisfied_indexes) {
+        cout << "ERROR: Same key has exist in index " << error_index_name << endl;
+        return DB_FAILED;
       }
-      Row index_check_row(index_key_fields);
-      vector<RowId> tmp_result;
-      if (index->GetIndex()->ScanKey(index_check_row, tmp_result, nullptr, "") == DB_SUCCESS) {
-        // 在b+树中找到了同样的节点，说明这个新行不满足唯一性
-        is_satisfied_indexes = false;
-        error_index_name = index->GetIndexName();
-        break;
-      }
-    }
-    if (!is_satisfied_indexes) {
-      cout << "ERROR: Same key has exist in index " << error_index_name << endl;
-      return DB_FAILED;
     }
     // 利用fields构建新的Row并update,注意保持rowid不变
     Row new_row(new_fields);
     new_row.SetRowId(itr);
     table_heap->UpdateTuple(new_row, itr, nullptr);
     // 更新index，先romoveEntry再insertEntry
-    for (auto index : indexes) {
-      auto index_columns = index->GetIndexKeySchema()->GetColumns();
-      vector<uint32_t> column_indexes;  // 索引列的index标号
-      for (auto index_column : index_columns) {
-        uint32_t tmp;
-        if (table_info->GetSchema()->GetColumnIndex(index_column->GetName(), tmp) == DB_SUCCESS) {
-          column_indexes.emplace_back(tmp);
+    if (indexes.size() != 0) {
+      for (auto index : indexes) {
+        auto index_columns = index->GetIndexKeySchema()->GetColumns();
+        vector<uint32_t> column_indexes;  // 索引列的index标号
+        for (auto index_column : index_columns) {
+          uint32_t tmp;
+          if (table_info->GetSchema()->GetColumnIndex(index_column->GetName(), tmp) == DB_SUCCESS) {
+            column_indexes.emplace_back(tmp);
+          }
         }
+        vector<Field> index_key_fields;
+        for (auto column_index : column_indexes) {
+          index_key_fields.emplace_back(new_fields[column_index]);
+        }
+        Row index_row(index_key_fields);
+        index->GetIndex()->RemoveEntry(index_row, new_row.GetRowId(), nullptr);
+        index->GetIndex()->InsertEntry(index_row, new_row.GetRowId(), nullptr);
       }
-      vector<Field> index_key_fields;
-      for (auto column_index : column_indexes) {
-        index_key_fields.emplace_back(new_fields[column_index]);
-      }
-      Row index_row(index_key_fields);
-      index->GetIndex()->RemoveEntry(index_row,new_row.GetRowId(), nullptr);
-      index->GetIndex()->InsertEntry(index_row,new_row.GetRowId(), nullptr);
     }
     dbs_[current_db_]->bpm_->FlushAllPages();
   }
