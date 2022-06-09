@@ -24,7 +24,9 @@ public:
     return new(buf) TableHeap(buffer_pool_manager, first_page_id, schema, log_manager, lock_manager);
   }
 
-  ~TableHeap() {}
+  ~TableHeap() {
+
+  }
 
   /**
    * Insert a tuple into the table. If the tuple is too large (>= page_size), return false.

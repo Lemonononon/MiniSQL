@@ -95,6 +95,7 @@ class Row {
 
   inline size_t GetFieldCount() const { return fields_.size(); }
 
+
  private:
   Row &operator=(const Row &other) = delete;
 
