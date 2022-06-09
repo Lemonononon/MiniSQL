@@ -28,7 +28,6 @@ INDEX_TEMPLATE_ARGUMENTS
 dberr_t BPLUSTREE_INDEX_TYPE::RemoveEntry(const Row &key, RowId row_id, Transaction *txn) {
   KeyType index_key;
   index_key.SerializeFromKey(key, key_schema_);
-
   container_.Remove(index_key, txn);
   return DB_SUCCESS;
 }
