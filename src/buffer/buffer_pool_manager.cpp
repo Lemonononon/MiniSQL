@@ -164,7 +164,7 @@ bool BufferPoolManager::FlushAllPages() {
       if (FlushPage(pages_[i].page_id_)) {
         // cout << "success" << endl;
       } else {
-        cout << "failed" << endl;
+        // cout << "failed" << endl;
       }
     }
   }
