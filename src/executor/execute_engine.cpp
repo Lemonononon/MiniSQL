@@ -656,11 +656,11 @@ dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext *context) {
   if (get_table_result != DB_SUCCESS) return get_table_result;
   vector<Field> fields;
   auto columns = table_info->GetSchema()->GetColumns();
-  //约束性的判断，unique和primary都需要满足唯一、非空（不是null）
-  //不需要去column判断是否unique，直接获取这张表的索引，索引unique即可（因为minisql的约束并不完整
+  // 约束性的判断，unique和primary都需要满足唯一、非空（不是null）
+  // 不需要去column判断是否unique，直接获取这张表的索引，索引unique即可（因为minisql的约束并不完整
   std::vector<IndexInfo *> indexes;
-  if (dbs_[current_db_]->catalog_mgr_->GetTableIndexes(table_name, indexes)!=DB_SUCCESS){
-    cout << "Indexes exist, but query index info failed" << endl;
+  if (dbs_[current_db_]->catalog_mgr_->GetTableIndexes(table_name, indexes) != DB_SUCCESS) {
+    cout << "ERROR: Indexes exist, but query index info failed" << endl;
     return DB_FAILED;
   }
   // 第一个value
@@ -669,17 +669,9 @@ dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext *context) {
   for (auto itr = columns.begin(); itr != columns.end(); itr++) {
     // node为空，则insert的数据有错
     if (!val_node) {
-      cout << "wrong insert format!" << endl;
+      cout << "ERROR: Wrong insert format" << endl;
       return DB_FAILED;
     }
-//    if ((*itr)->IsUnique()){
-//      if (string(val_node->val_) == "null"){
-//        cout << "can not insert null to unique column"<< endl;
-//        context->related_row_num_ = 0;
-//        return DB_FAILED;
-//      }
-//      //判断唯一性，去索引里面查找
-//    }
 
     uint32_t type = (*itr)->GetType();
     // int
@@ -699,9 +691,54 @@ dberr_t ExecuteEngine::ExecuteInsert(pSyntaxNode ast, ExecuteContext *context) {
 
   Row row(fields);
   // 插入数据
+  // 遍历所有索引，检查插入后是否保持唯一性
+  bool is_satisfied_indexes = true;
+  string error_index_name;
+  for (auto index : indexes) {
+    auto index_columns = index->GetIndexKeySchema()->GetColumns();
+    vector<uint32_t> column_indexes;  // 索引列的index标号
+    for (auto index_column : index_columns) {
+      uint32_t tmp;
+      if (table_info->GetSchema()->GetColumnIndex(index_column->GetName(), tmp) == DB_SUCCESS) {
+        column_indexes.emplace_back(tmp);
+      }
+    }
+    vector<Field> index_key_fields;
+    for (auto column_index : column_indexes) {
+      index_key_fields.emplace_back(fields[column_index]);
+    }
+    Row index_check_row(index_key_fields);
+    vector<RowId> tmp_result;
+    if (index->GetIndex()->ScanKey(index_check_row, tmp_result, nullptr, "") == DB_SUCCESS) {
+      // 在b+树中找到了同样的节点，说明这个新行不满足唯一性
+      is_satisfied_indexes = false;
+      error_index_name = index->GetIndexName();
+      break;
+    }
+  }
+  if (!is_satisfied_indexes) {
+    cout << "ERROR: Same key has exist in index " << error_index_name << endl;
+    return DB_FAILED;
+  }
+  // 这里插入后，里面已经给这个row加上了rowid
   table_info->GetTableHeap()->InsertTuple(row, nullptr);
-  // TODO:更新索引
-
+  // 更新全部该表中的索引
+  for (auto index : indexes) {
+    auto index_columns = index->GetIndexKeySchema()->GetColumns();
+    vector<uint32_t> column_indexes;  // 索引列的index标号
+    for (auto index_column : index_columns) {
+      uint32_t tmp;
+      if (table_info->GetSchema()->GetColumnIndex(index_column->GetName(), tmp) == DB_SUCCESS) {
+        column_indexes.emplace_back(tmp);
+      }
+    }
+    vector<Field> index_key_fields;
+    for (auto column_index : column_indexes) {
+      index_key_fields.emplace_back(fields[column_index]);
+    }
+    Row index_row(index_key_fields);
+    index->GetIndex()->InsertEntry(index_row, row.GetRowId(), nullptr);
+  }
   dbs_[current_db_]->bpm_->FlushAllPages();
   return DB_SUCCESS;
 }
