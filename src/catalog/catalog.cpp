@@ -276,8 +276,9 @@ dberr_t CatalogManager::DropTable(const string &table_name) {
   if (table_id_it == table_names_.end()) return DB_TABLE_NOT_EXIST;
   table_id_t table_id = table_id_it->second;
   // step2:删除储存table的页和储存matadata的页
-  if (!buffer_pool_manager_->DeletePage(tables_[table_id]->GetRootPageId())) return DB_FAILED;
-  if (!buffer_pool_manager_->DeletePage(catalog_meta_->table_meta_pages_[table_id])) return DB_FAILED;
+  //  暂时不删除了，因为我不是很清楚删除所需要做的前置工作
+//  if (!buffer_pool_manager_->DeletePage(tables_[table_id]->GetRootPageId())) return DB_FAILED;
+//  if (!buffer_pool_manager_->DeletePage(catalog_meta_->table_meta_pages_[table_id])) return DB_FAILED;
   // step3:删除各个map中对应的table
   tables_.erase(tables_.find(table_id));
   table_names_.erase(table_names_.find(table_name));
@@ -285,6 +286,7 @@ dberr_t CatalogManager::DropTable(const string &table_name) {
   // 回收各个map中该table的index
   if (index_names_.find(table_name) != index_names_.end()) {
     for (const auto &index_pair : index_names_[table_name]) {
+      catalog_meta_->index_meta_pages_.erase(index_pair.second);
       indexes_.erase(index_pair.second);
     }
     index_names_.erase(table_name);
