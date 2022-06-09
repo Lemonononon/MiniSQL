@@ -813,6 +813,7 @@ dberr_t ExecuteEngine::ExecuteUpdate(pSyntaxNode ast, ExecuteContext *context) {
     }
   }
   //开始update
+  context->related_row_num_ = results.size();
   Schema * now_schema = table_info->GetSchema();
   for(auto itr: results){
     vector<Field> new_fields;
