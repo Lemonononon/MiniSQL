@@ -456,7 +456,12 @@ INDEX_TEMPLATE_ARGUMENTS
 INDEXITERATOR_TYPE BPLUSTREE_TYPE::Begin(const KeyType &key) {
   Page *page = FindLeafPage(key, false);
   auto leaf_page = reinterpret_cast<B_PLUS_TREE_LEAF_PAGE_TYPE *>(page->GetData());
-  return INDEXITERATOR_TYPE(false, &comparator_, leaf_page, buffer_pool_manager_);
+  auto iter = INDEXITERATOR_TYPE(true, &comparator_, leaf_page, buffer_pool_manager_);
+  // 返回第一个大于等于的地方
+  while (comparator_((*iter).first, key) < 0) {
+    ++iter;
+  }
+  return iter;
 }
 
 /*

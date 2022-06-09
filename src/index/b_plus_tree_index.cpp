@@ -44,7 +44,9 @@ dberr_t BPLUSTREE_INDEX_TYPE::ScanKey(const Row &key, vector<RowId> &result, Tra
     return DB_KEY_NOT_FOUND;
   } else if (condition == ">") {
     auto iter = GetBeginIterator(index_key);
-    ++iter;
+    if (iter != GetEndIterator() && comparator_((*iter).first, index_key) == 0) {
+      ++iter;
+    }
     while (iter != GetEndIterator()) {
       result.emplace_back((*iter).second);
       ++iter;
