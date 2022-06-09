@@ -281,7 +281,7 @@ dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext *conte
     }
   }
   if (primary_keys.size() > 0) {
-    string primary_index_name = "PRIMARY";
+    string primary_index_name = table_name + "_"+ "PRIMARY";
     IndexInfo *primary_index_info;
     if (dbs_[current_db_]->catalog_mgr_->CreateIndex(table_name, primary_index_name, primary_keys, nullptr, primary_index_info)){
       cout << "ERROR: Primary Key Index create failed" << endl;
@@ -292,7 +292,7 @@ dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext *conte
 
   //为所有的unique列建立索引
   for ( auto unique_itr = unique_indexes.begin(); unique_itr != unique_indexes.end() ; unique_itr++) {
-    string unique_index_name = (*unique_itr)[0];
+    string unique_index_name = table_name + "_" + (*unique_itr)[0];
     IndexInfo *unique_index_info;
     if (dbs_[current_db_]->catalog_mgr_->CreateIndex(table_name, unique_index_name, *unique_itr, nullptr, unique_index_info)){
       cout << "Create unique index on " << unique_index_name << "failed" << endl;
