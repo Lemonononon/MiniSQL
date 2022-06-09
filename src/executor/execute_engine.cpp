@@ -538,6 +538,7 @@ dberr_t ExecuteEngine::ExecuteSelect(pSyntaxNode ast, ExecuteContext *context) {
   if (ast->next_) {
     ast = ast->next_->child_;
     while (ast->type_ == kNodeConnector) {
+      // TODO: 忘了加条件里的列名是否合法，非法会段错误，没空加就算了
       now_condition.emplace_back(ast->child_->next_);
       string connector = ast->val_;
       if (connector == "or") {
@@ -1345,6 +1346,7 @@ vector<RowId> GetSatisfiedRowIds(vector<vector<SyntaxNode *>> conditions, TableI
             } else if (column->GetType() == TypeId::kTypeFloat) {
               fields.emplace_back(Field(column->GetType(), (float)atof(condition->child_->next_->val_)));
             }
+            break;
           }
         }
       }
