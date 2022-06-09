@@ -347,11 +347,11 @@ dberr_t ExecuteEngine::ExecuteShowIndexes(pSyntaxNode ast, ExecuteContext *conte
   }
 
   std::vector<IndexInfo *> indexes;
-  std::vector<IndexInfo *> tmp_indexes;
+//  std::vector<IndexInfo *> tmp_indexes;
   for ( auto itr = tables.begin(); itr != tables.end(); itr++) {
-    if ( dbs_[current_db_]->catalog_mgr_->GetTableIndexes((*itr)->GetTableName(), tmp_indexes) != DB_SUCCESS) return DB_FAILED;
+    if ( dbs_[current_db_]->catalog_mgr_->GetTableIndexes((*itr)->GetTableName(), indexes) != DB_SUCCESS) return DB_FAILED;
     //insert效率会低? 不过一般index较少，影响不大
-    indexes.insert(indexes.end(), tmp_indexes.begin(), tmp_indexes.end());
+//    indexes.insert(indexes.end(), tmp_indexes.begin(), tmp_indexes.end());
   }
 
   if (indexes.empty()) {
