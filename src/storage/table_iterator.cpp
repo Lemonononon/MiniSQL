@@ -23,6 +23,7 @@ bool TableIterator::operator==(const TableIterator &itr) const {
     return true;
   }
   else if(itr.row_->GetRowId()==INVALID_ROWID||row_->GetRowId()==INVALID_ROWID){
+
     return false;
   }
   else if(itr.row_->GetRowId().GetPageId()==row_->GetRowId().GetPageId()
