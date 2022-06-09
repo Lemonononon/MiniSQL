@@ -3,6 +3,7 @@
 #include "glog/logging.h"
 #include "parser/syntax_tree_printer.h"
 #include "utils/tree_file_mgr.h"
+#include <sys/time.h>
 
 #define ENABLE_PARSER_DEBUG
 
@@ -73,8 +74,13 @@ int main(int argc, char **argv) {
     }
 
     ExecuteContext context;
+    timeval start, end;
+    gettimeofday(&start, NULL);
     engine.Execute(MinisqlGetParserRootNode(), &context);
+    gettimeofday(&end, NULL);
     sleep(1);
+    cout << context.related_row_num_ << " rows affected ";
+    cout << "(" << ((end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec)/1000000.0) << "s" << ")" << endl;
 
     // clean memory after parse
     MinisqlParserFinish();

@@ -6,9 +6,10 @@
 #include "common/dberr.h"
 #include "common/instance.h"
 #include "transaction/transaction.h"
-
 extern "C" {
+int yyparse(void);
 #include "parser/parser.h"
+#include "parser/minisql_lex.h"
 };
 
 /**
@@ -18,6 +19,7 @@ extern "C" {
  * eg: transaction info, execute result...
  */
 struct ExecuteContext {
+  int related_row_num_{0};
   bool flag_quit_{false};
   Transaction *txn_{nullptr};
 };
