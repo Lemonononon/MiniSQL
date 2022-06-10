@@ -398,6 +398,7 @@ dberr_t CatalogManager::LoadIndex(const index_id_t index_id, const page_id_t pag
   // 更新CatalogManage的map
   if (table_names_.find(table_name) == table_names_.end()) {
     // 没有对应的table
+    buffer_pool_manager_->UnpinPage(page_id, false);
     return DB_TABLE_NOT_EXIST;
   } else {
     // 有对应的table
