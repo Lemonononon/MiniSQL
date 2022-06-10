@@ -68,13 +68,34 @@ ValueType B_PLUS_TREE_INTERNAL_PAGE_TYPE::ValueAt(int index) const {
 INDEX_TEMPLATE_ARGUMENTS
 ValueType B_PLUS_TREE_INTERNAL_PAGE_TYPE::Lookup(const KeyType &key, const KeyComparator &comparator) const {
   // replace with your own code
-  // TODO: 跑通后来优化为二分查找
-  for (int i = 1; i < GetSize(); ++i) {
-    // array_[i].first > key
-    if (comparator(array_[i].first, key) > 0) {
-      return array_[i - 1].second;
+  // 后来优化为二分查找
+  int has_found = 0;
+  // 找到的第一个大于等于key的node
+  int found_index = GetSize();
+  int left = 1;
+  int right = GetSize() - 1;
+  while (left <= right) {
+    int mid = (left + right) / 2;
+    if (comparator(array_[mid].first, key) >= 0) {
+      right = mid - 1;
+      has_found = 1;
+      found_index = mid;
+    } else {
+      left = mid + 1;
     }
   }
+  if (has_found) {
+    if (comparator(array_[found_index].first, key) == 0) {
+      found_index++;
+    }
+    return array_[found_index - 1].second;
+  }
+//  for (int i = 1; i < GetSize(); ++i) {
+//    // array_[i].first > key
+//    if (comparator(array_[i].first, key) > 0) {
+//      return array_[i - 1].second;
+//    }
+//  }
   return array_[GetSize() - 1].second;
 }
 
