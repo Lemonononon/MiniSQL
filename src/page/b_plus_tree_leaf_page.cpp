@@ -36,11 +36,23 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::SetNextPageId(page_id_t next_page_id) { this->n
  */
 INDEX_TEMPLATE_ARGUMENTS
 int B_PLUS_TREE_LEAF_PAGE_TYPE::KeyIndex(const KeyType &key, const KeyComparator &comparator) const {
-  for (int i = 0; i < GetSize(); ++i) {
-    if (comparator(array_[i].first, key) == 0) {
-      return i;
+  int left = 0;
+  int right = GetSize() - 1;
+  while (left <= right) {
+    int mid = (left + right) / 2;
+    if (comparator(array_[mid].first, key) == 0) {
+      return mid;
+    } else if (comparator(array_[mid].first, key) < 0) {
+      left = mid + 1;
+    } else {
+      right = mid - 1;
     }
   }
+//  for (int i = 0; i < GetSize(); ++i) {
+//    if (comparator(array_[i].first, key) == 0) {
+//      return i;
+//    }
+//  }
   return GetSize();
 }
 
@@ -73,19 +85,39 @@ const MappingType &B_PLUS_TREE_LEAF_PAGE_TYPE::GetItem(int index) {
  */
 INDEX_TEMPLATE_ARGUMENTS
 int B_PLUS_TREE_LEAF_PAGE_TYPE::Insert(const KeyType &key, const ValueType &value, const KeyComparator &comparator) {
-  int hasInserted = 0;
-  // TODO: 后续修改为二分查找
-  for (int i = 0; i < GetSize(); ++i) {
-    if (comparator(array_[i].first, key) > 0) {
-      for (int j = GetSize(); j > i; --j) {
-        array_[j] = array_[j - 1];
-      }
-      array_[i] = {key, value};
-      hasInserted = 1;
-      break;
+  int has_inserted = 0;
+  int insert_index = GetSize();
+  // 修改为二分查找
+  int left = 0;
+  int right = GetSize() - 1;
+  while (left <= right) {
+    int mid = (left + right) / 2;
+    // 这里面插入时已经默认是不存在等于的
+    if (comparator(array_[mid].first, key) > 0) {
+      right = mid - 1;
+      has_inserted = 1;
+      insert_index = mid;
+    } else {
+      left = mid + 1;
     }
   }
-  if (!hasInserted) {
+  if (has_inserted) {
+    for (int j = GetSize(); j > insert_index; --j) {
+      array_[j] = array_[j - 1];
+    }
+    array_[insert_index] = {key, value};
+  }
+//  for (int i = 0; i < GetSize(); ++i) {
+//    if (comparator(array_[i].first, key) > 0) {
+//      for (int j = GetSize(); j > i; --j) {
+//        array_[j] = array_[j - 1];
+//      }
+//      array_[i] = {key, value};
+//      has_inserted = 1;
+//      break;
+//    }
+//  }
+  if (!has_inserted) {
     array_[GetSize()] = {key, value};
   }
   IncreaseSize(1);
@@ -124,14 +156,27 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::CopyNFrom(MappingType *items, int size) {
  */
 INDEX_TEMPLATE_ARGUMENTS
 bool B_PLUS_TREE_LEAF_PAGE_TYPE::Lookup(const KeyType &key, ValueType &value, const KeyComparator &comparator) const {
-  // TODO: 跑通后来优化为二分查找
-  for (int i = 0; i < GetSize(); ++i) {
-    // array_[i].first == key
-    if (comparator(array_[i].first, key) == 0) {
-      value = array_[i].second;
+  // 跑通后来优化为二分查找
+  int left = 0;
+  int right = GetSize() - 1;
+  while (left <= right) {
+    int mid = (left + right) / 2;
+    if (comparator(array_[mid].first, key) == 0) {
+      value = array_[mid].second;
       return true;
+    } else if (comparator(array_[mid].first, key) < 0) {
+      left = mid + 1;
+    } else {
+      right = mid - 1;
     }
   }
+//  for (int i = 0; i < GetSize(); ++i) {
+//    // array_[i].first == key
+//    if (comparator(array_[i].first, key) == 0) {
+//      value = array_[i].second;
+//      return true;
+//    }
+//  }
   return false;
 }
 
