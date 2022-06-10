@@ -153,6 +153,7 @@ dberr_t CatalogManager::CreateTable(const string &table_name, TableSchema *schem
   //  meta_data_page->WUnlatch();
   catalog_meta_->table_meta_pages_[table_id] = meta_data_page_id;
   // 将改动刷盘
+  buffer_pool_manager_->UnpinPage(meta_data_page_id,true);
   FlushCatalogMetaPage();
   return DB_SUCCESS;
 }
@@ -277,8 +278,8 @@ dberr_t CatalogManager::DropTable(const string &table_name) {
   table_id_t table_id = table_id_it->second;
   // step2:删除储存table的页和储存matadata的页
   //  暂时不删除了，因为我不是很清楚删除所需要做的前置工作
-//  if (!buffer_pool_manager_->DeletePage(tables_[table_id]->GetRootPageId())) return DB_FAILED;
-//  if (!buffer_pool_manager_->DeletePage(catalog_meta_->table_meta_pages_[table_id])) return DB_FAILED;
+  if (!buffer_pool_manager_->DeletePage(tables_[table_id]->GetRootPageId())) return DB_FAILED;
+  if (!buffer_pool_manager_->DeletePage(catalog_meta_->table_meta_pages_[table_id])) return DB_FAILED;
   // step3:删除各个map中对应的table
   tables_.erase(tables_.find(table_id));
   table_names_.erase(table_names_.find(table_name));
