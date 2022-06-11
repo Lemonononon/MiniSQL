@@ -8,7 +8,9 @@ A DB project for DB course in ZJU.
 
 ### Bitmap
 
+![image.png](https://beetpic.oss-cn-hangzhou.aliyuncs.com/img/1648371054209-c0dd543c-8ca2-4be0-b0b9-e4a505b0c2de.png)
 
+Bitmap Content中，每一个char字节存储了8个bit，也就是8个page是否被使用了的信息。我们通过位运算对其进行维护，以此快速检查数据页的使用情况。
 
 ### Disk Manager
 
@@ -296,6 +298,10 @@ Catalog Manager这个模块的核心要义就是完成```CatalogManager```类，
 
 ## SQL Executor
 
+### ExecuteEngine的初始化
+
+我们将所有的数据库文件存储在`./db`这个目录下，在启动时，如果不存在此目录则创建，然后使用linux的遍历文件接口，将目录下所有.db文件的文件名（也就是实际上的database name）读入一个vector。使用path `./db`和文件名初始化`DBStorageEngine`，这样就建立了程序和硬盘文件的连接。
+
 ### select
 
 ![graphviz (2)](https://beetpic.oss-cn-hangzhou.aliyuncs.com/img/graphviz%20(2).svg)
@@ -350,7 +356,7 @@ ScanKey(const Row &key, vector<RowId> &result, Transaction *txn, string conditio
 
 一个简单的函数，返回这个Field的值转换成的字符串。需要传入这个Field的type。在打印的时候，这个函数非常有用。
 
-#### vector\<RowId\> GetSatisfiedRowIds(vector<vector<SyntaxNode*>> conditions, TableInfo* table_info, vector<IndexInfo *> indexes);
+#### vector\<RowId\> GetSatisfiedRowIds(vector<vector<SyntaxNode\*>> conditions, TableInfo\* table_info, vector<IndexInfo *> indexes);
 
 一个很复杂的函数，返回这个table中满足conditions的所有RowId。传入的参数中，table_info和indexes很容易理解，都可以在catalog manager中获取。
 
