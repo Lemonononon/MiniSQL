@@ -26,9 +26,11 @@ Least Recently Used算法，将最近最少使用的数据页回收。具体的�
 
 [LRU Cache Implementation - GeeksforGeeks](https://www.geeksforgeeks.org/lru-cache-implementation/?ref=leftbar-rightbar)
 
-#### Clock
+#### Clock(Bonus)
 
+时钟置换算法可以认为是一种最近未使用算法，即逐出的页面都是最近没有使用的那个。将所有的buffer page环绕成一圈，并把status置为true。当需要Victim的时候就用指针旋转，找到第一个status=false的节点，沿途如果遇到status=true的节点，就将其status置为false。
 
+需要注意的是，一旦有page被Unpin了，就需要将其初始化到指针的前面，使得他不会立马在下一轮victim中成为第一个被检查的page，因为这不符合最近未使用算法的原则。
 
 ### Buffer Pool Manager
 
@@ -273,11 +275,11 @@ Catalog Manager这个模块的核心要义就是完成```CatalogManager```类，
 
 ### 为上层模块提供的操作方式
 
-详情见于```catalog.h```，对于每个函数的作用和执行方式，已有足够详细的代码注释，不再赘述。
+有关提供的操作方式见于```catalog.h```。Catalog模块对上层执行器提供有关表和索引等组织信息，并且提供直接的操作接口。在所有的对于数据库的结构有改动的操作发生后，Catalog会自动进行FlushCatalogMetaPage，使得数据被及时地序列化入磁盘中。
 
 ### FlushCatalogMetaPage()函数的作用
 
-该函数将会立刻把目前CatalogMetaData写入对应数据页，并且根据助教的建议，将会即刻刷盘。
+该函数将会立刻把目前CatalogMetaData写入对应数据页，并且根据框架作者的建议，将会即刻刷盘。
 
 ### 有关next_table_id以及next_index_id的处理
 
