@@ -35,8 +35,6 @@ uint32_t Row::SerializeTo(char *buf, Schema *schema) const {
     ofs++;
     buf++;
   }
-
-
   // write fields_
   for (uint32_t i = 0; i < fields_.size(); i++) {
     // 不为空的field才被写入
