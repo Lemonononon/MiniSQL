@@ -452,3 +452,11 @@ conditions，为什么是一个双重vector？这个地方我实在想不出命�
 
 你可以参照select中的方式把语法树解析成conditions。
 
+### CreateTable
+
+对语法树进行解析，找到`table_name`， 根据每一列的`column_name`和`column_type`重建`Columns`，然后调用`catalog`提供的方法创建表。此外还需要考虑约束条件（`unique`, `primary key`等），这里在建表时会默认对`primary key`和`unique`列键索引。
+
+用vector记录主键包含的列，在建表之后，为其建立主键索引，索引名为`ColumnName_primary`，而`unique`列的索引名称则为`ColumnName` (借鉴自MySQL和PostgreSQL)。
+
+此外约束性条件为`unique`的列，还需要将表中Column的`unique_`标签置为1，约束性条件为`primary key`的列需要将表中Column的`not null`,`unique_`标签置为1，该框架`parser`的实现暂不支持`not null`，故仅仅标记一下，没有实际用途。
+
