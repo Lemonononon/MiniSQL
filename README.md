@@ -14,7 +14,11 @@ Bitmap Content中，每一个char字节存储了8个bit，也就是8个page是�
 
 ### Disk Manager
 
+有了bitmap之后，我们可以很方便地使用一个位图页加上一段连续的数据页（数据页的数量取决于位图页最大能够支持的比特数）来对磁盘文件（DB File）中数据页进行分配和回收。为了扩充我们可以表示的磁盘空间，将一个位图页加一段连续的数据页看成数据库文件中的一个分区（Extent），再通过一个额外的元信息页来记录这些分区的信息。通过这种“套娃”的方式，来使磁盘文件能够维护更多的数据页信息，实现如下图所示。
 
+![image-20220612191038341](README.assets/disk_manager.png)
+
+此外，再通过一次转换，只考虑实际保存数据的Extent Pages，使用与实际物理地址映射的虚拟page id，可以将数据页连续的呈现给上层Buffer Poll。
 
 ### Replacer
 
@@ -312,6 +316,20 @@ bool BPLUSTREE_TYPE::GetValue(const KeyType &key, std::vector<ValueType> &result
   + 找到兄弟节点，如果兄弟节点和本人合并size超标，则只从兄弟那里挪过来一个。
   + 如果兄弟节点和本人合并size不超标，则合并。
 
+### Index Iterator
+
+为B+树索引实现迭代器。该迭代器能够将所有的叶结点组织成为一个单向链表，然后沿着特定方向有序遍历叶结点数据页中的每个键值对（可以用于范围查询）。
+
+实现了`begin()`,  `begin(const KeyType &key)`, `end()`三种构造方法，其中`begin(const KeyType &key):`
+
+```
+/*
+ * Input parameter is low key, find the leaf page that contains the input key
+ * first, then construct index iterator
+ * @return : index iterator
+ */
+```
+
 ## Catalog Manager
 
 Catalog Manager这个模块的核心要义就是完成```CatalogManager```类，该类将作为Part5 Executor与前面三个part的桥梁使用。
@@ -433,3 +451,4 @@ ScanKey(const Row &key, vector<RowId> &result, Transaction *txn, string conditio
 conditions，为什么是一个双重vector？这个地方我实在想不出命名了，可能应该是conditions再加一个s才对（。考虑支持的逻辑运算符and和or。一旦有or的存在，那么只需要满足被or切割开的“由and相连的条件们”中的任意一项即可。比如a>1 and b<2 or c>3 or d<4，显然为了好好判断，我们需要把a>1 and b<2分为第一块，c>3分为第二块，d<4分为第三块。而conditions中保存的就是[[a>1, b<2], [c>3], [d<4]]。
 
 你可以参照select中的方式把语法树解析成conditions。
+
