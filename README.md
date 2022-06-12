@@ -240,6 +240,78 @@ TableIterator TableHeap::End() {
 
 + void BPlusTreeLeafPage::MoveAllTo(BPlusTreeLeafPage *recipient, const KeyType &, BufferPoolManager *);
 
+### B+树概述
+
+因为B+树内部的方法调用链过于繁多复杂，这里对其创建、插入、查找、删除的流程仅做概述。
+
+#### 创建
+
+我们看到
+
+```c++
+BPlusTree(index_id_t index_id, BufferPoolManager *buffer_pool_manager, const KeyComparator &comparator, int leaf_max_size, int internal_max_size)
+    : index_id_(index_id),
+      buffer_pool_manager_(buffer_pool_manager),
+      comparator_(comparator),
+      leaf_max_size_(leaf_max_size),
+      internal_max_size_(internal_max_size);
+```
+
+构造函数中，传入了index_id，这是在catalog中记录的索引信息，在config中，我们规定了`INDEX_ROOTS_PAGE_ID`为固定值，于是在初始化时，去`index_roots_page`中寻找是否有此index_id的对应树根，如果有，初始化`root_page_id`。否则让`root_page_id`为`INVALID_PAGE_ID`。
+
+#### 插入
+
+```c++
+INDEX_TEMPLATE_ARGUMENTS
+bool BPLUSTREE_TYPE::Insert(const KeyType &key, const ValueType &value, Transaction *transaction) {
+  bool res = false;
+  if (IsEmpty()) {
+    StartNewTree(key, value);
+    res = true;
+  } else {
+    res = InsertIntoLeaf(key, value, transaction);
+  }
+  return res;
+}
+```
+
+这里的入口逻辑还是非常简单的，没根则建根，有根则插入。我们看看插入是怎么做的：
+
++ 二分查找内部节点，找到可能所在的孩子，递归查找孩子，直到叶子节点。
++ 如果叶子节点还没满，直接插入。注意插入时，如果插入了叶子的第一个位置，那么需要更新父亲的对应key。
++ 如果叶子满了，将叶子拆成两半，将新的node插入合适的一半中。这里需要注意的是，一方面拆成两半时需要向父亲节点插入一个新pair，另一方面记得维护叶子节点串成的链表，保持B+树可顺序遍历叶子的特性。
+
+#### 查找
+
+```c++
+INDEX_TEMPLATE_ARGUMENTS
+bool BPLUSTREE_TYPE::GetValue(const KeyType &key, std::vector<ValueType> &result, Transaction *transaction) {
+  auto leaf_page = FindLeafPage(key);
+  if (leaf_page == nullptr) return false;
+  auto leaf = reinterpret_cast<B_PLUS_TREE_LEAF_PAGE_TYPE *>(leaf_page->GetData());
+  bool res = false;
+  if (leaf != nullptr) {
+    ValueType value;
+    if (leaf->Lookup(key, value, comparator_)) {
+      result.push_back(value);
+      res = true;
+    }
+  }
+  buffer_pool_manager_->UnpinPage(leaf->GetPageId(), false);
+  return res;
+}
+```
+
+十分简单的处理，二分查找内部节点，找到可能所在的孩子，递归查找孩子，直到叶子节点。最后在叶子节点里二分查找。
+
+#### 删除
+
++ 查找到响应的叶子节点，从叶子节点中将其删除
++ 如果此叶子节点并非根（即有父亲），并且删除的位置为第一个，那么需要更新父亲节点中的key。
++ 如果删除后叶子节点少于最小size，启动以下策略：
+  + 找到兄弟节点，如果兄弟节点和本人合并size超标，则只从兄弟那里挪过来一个。
+  + 如果兄弟节点和本人合并size不超标，则合并。
+
 ## Catalog Manager
 
 Catalog Manager这个模块的核心要义就是完成```CatalogManager```类，该类将作为Part5 Executor与前面三个part的桥梁使用。
