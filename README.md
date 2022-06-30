@@ -4,6 +4,52 @@ A DB project for DB course in ZJU.
 
 [toc]
 
+## Introduction
+
+MiniSQL是一个简易的DBMS，实现了基本的存储、读取、增删查改、创建B+树索引等功能。目前复合索引仅在点查时会被使用，其余情况使用单列索引/全表扫描。单列的索引支持范围查询。
+
+### 支持的SQL语句
+
+```sql
+create database db0;
+drop database db0;
+show databases;
+use db0;
+show tables;
+create table t1(a int, b char(20) unique, c float, primary key(a, c));
+create table t1(a int, b char(0) unique, c float, primary key(a, c));
+create table t1(a int, b char(-5) unique, c float, primary key(a, c));
+create table t1(a int, b char(3.69) unique, c float, primary key(a, c));
+create table t1(a int, b char(-0.69) unique, c float, primary key(a, c));
+create table student(
+  sno char(8),
+  sage int,
+  sab float unique,
+  primary key (sno, sab)
+);
+drop table t1;
+create index idx1 on t1(a, b);
+create index idx1 on t1(a, b) using bptree;
+drop index idx1;
+show indexes;
+select * from t1;
+select id, name from t1;
+select * from t1 where id = 1;
+select * from t1 where id = 1 and name = "str";
+select * from t1 where id = 1 and name = "str" or age is null and bb not null;
+insert into t1 values(1, "aaa", null, 2.33);
+delete from t1;
+delete from t1 where id = 1 and amount = 2.33;
+update t1 set c = 3;
+update t1 set a = 1, b = "ccc" where b = 2.33;
+quit;
+execfile "a.txt";
+```
+
+### 架构图
+
+![image.png](https://beetpic.oss-cn-hangzhou.aliyuncs.com/img/1648365471553-1ceac0a4-e909-42c8-8bb9-516409e03492.png)
+
 ## Disk and Buffer Pool Manager
 
 ### Bitmap
