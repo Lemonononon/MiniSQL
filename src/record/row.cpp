@@ -5,11 +5,11 @@ using namespace std;
 uint32_t Row::SerializeTo(char *buf, Schema *schema) const {
   // replace with your code here
   // 若整个row空 则啥也不写进去
-
   if (fields_.size() == 0) {
     return 0;
   }
   uint32_t ofs = 0;
+
   // write fields num
   uint32_t fields_num = fields_.size();
   MACH_WRITE_UINT32(buf, fields_num);
@@ -52,6 +52,7 @@ uint32_t Row::DeserializeFrom(char *buf, Schema *schema) {
   // read fields num
   uint32_t ofs = 0;
   uint32_t field_num = MACH_READ_UINT32(buf);
+  MemHeap *heap = new SimpleMemHeap();
   buf += 4;
   ofs += 4;
   // read null bitmap
@@ -85,11 +86,11 @@ uint32_t Row::DeserializeFrom(char *buf, Schema *schema) {
       f = new Field(TypeId::kTypeFloat, 0.0f);
     }
     if (map[i] == 0) {
-      t = f->DeserializeFrom(buf, type, &f, true, heap_);
+      t = f->DeserializeFrom(buf, type, &f, true, heap);
       ofs += t;
       buf += t;
     } else {
-      t = f->DeserializeFrom(buf, type, &f, false, heap_);
+      t = f->DeserializeFrom(buf, type, &f, false, heap);
       ofs += t;
       buf += t;
     }
